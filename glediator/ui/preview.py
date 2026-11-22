@@ -26,7 +26,7 @@ class FramePreview(QGroupBox):
         self.image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image.setMinimumSize(1, 1)
         self.image.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.image.setStyleSheet("background:#080c11; border-radius:5px; color:#627386;")
+        self.image.setStyleSheet("background:#080c11; border-radius:5px; color:#627386; padding:0;")
         layout.addWidget(self.image, 1)
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

@@ -261,6 +261,7 @@ class NetworkPanel(QGroupBox):
 
         dot = QLabel("●")
         dot.setFixedWidth(12)
+        dot.setStyleSheet("padding:0; background:transparent;")
         label = QLabel()
         label.setMinimumWidth(0)
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)

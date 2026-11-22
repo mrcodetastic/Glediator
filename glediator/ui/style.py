@@ -72,8 +72,15 @@ def build_stylesheet(theme: str = "dark") -> str:
             border:1px solid {p['menu_border']}; min-width:225px;
         }}
         QMenu::item:selected {{ background:{p['menu_popup_sel']}; color:#102438; }}
-        QLabel#appTitle {{ font-size:22pt; font-weight:700; letter-spacing:2px; color:{p['title']}; }}
-        QLabel#subtitle {{ color:{p['muted']}; font-size:8pt; letter-spacing:2px; padding-left:10px; padding-top:6px; }}
+        QLabel {{ padding:2px 6px; border-radius:5px; }}
+        QLabel#appTitle {{
+            font-size:22pt; font-weight:700; letter-spacing:2px; color:{p['title']};
+            padding:0; background:transparent;
+        }}
+        QLabel#subtitle {{
+            color:{p['muted']}; font-size:8pt; letter-spacing:2px;
+            padding:6px 0 0 10px; background:transparent;
+        }}
         QFrame#headerDivider {{ color:{p['divider']}; background:{p['divider']}; max-height:1px; }}
         QLabel#previewTitle {{ color:{p['label']}; font-size:9pt; font-weight:600; letter-spacing:1px; }}
         QLabel#status {{ color:{p['status_ok']}; font-size:9pt; }}
