@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glediator3"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Real-time LED matrix visualizer and mixer"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.26", "PySide6>=6.6", "Pillow>=10.0", "websockets>=12.0", "mss>=9.0", "soundcard>=0.4.3"]
@@ -24,6 +24,9 @@ include = ["glediator*"]
 
 [tool.setuptools.package-data]
 "glediator.assets.fonts" = ["*.ttf"]
+
+[tool.setuptools.dynamic]
+version = {attr = "glediator.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
