@@ -7,6 +7,7 @@ from glediator.generators.palettes import colorize
 class StarfieldEffect(ConfiguredEffect):
     name = "Starfield"
     description = "Stars moving through a simulated depth field."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def __init__(self):
@@ -15,7 +16,11 @@ class StarfieldEffect(ConfiguredEffect):
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):
         if self._stars is None:
-            self._stars = np.column_stack((self._rng.uniform(-1, 1, 90), self._rng.uniform(-1, 1, 90), self._rng.random(90))).astype(np.float32)
+            self._stars = np.column_stack((
+                self._rng.uniform(-1, 1, 90),
+                self._rng.uniform(-1, 1, 90),
+                self._rng.random(90),
+            )).astype(np.float32)
         depth = np.mod(self._stars[:, 2] + time_seconds * self.parameters["speed"] * .12, 1)
         factor = .08 + depth * .9
         px = np.rint(width * (.5 + self._stars[:, 0] * factor * .5)).astype(int)

@@ -5,13 +5,17 @@ from glediator.generators.palettes import PALETTE_NAMES
 class ScrollingTextEffect(ConfiguredEffect):
     name = "Scrolling Text"
     description = "Scrolling text using a selected font and palette."
+    category = "Text"
     settings = {
         "text": ("str", "GLEDIATOR", "", "", ""),
         "font": ("font", "Arial", "", "", ""),
         "font_size": ("int", 18, 6, 96, 1),
         "direction": ("choice", "Left", ("Left", "Right", "Up", "Down"), "", ""),
         "speed": ("float", 5.0, 0.0, 30.0, 0.5),
+        "color_mode": ("choice", "Palette", ("Palette", "Solid"), "", ""),
         "palette": ("choice", "Ocean", PALETTE_NAMES, "", ""),
+        "color": ("color", "#1EDCFF", "", "", ""),
+        "background": ("color", "#000000", "", "", ""),
     }
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

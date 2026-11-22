@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class PlasmaEffect(ConfiguredEffect):
     name = "Plasma"
     description = "Layered animated plasma fields."
+    category = "Generative"
     settings = {
         "scale": ("float", 8.0, 2.0, 24.0, 0.5),
         "speed": ("float", 1.0, 0.1, 5.0, 0.1),

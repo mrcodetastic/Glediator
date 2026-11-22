@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class FireEffect(ConfiguredEffect):
     name = "Fire"
     description = "Procedural flickering fire with configurable heat and sparks."
+    category = "Generative"
     settings = {
         "cooling": ("float", 1.0, 0.3, 2.0, 0.1),
         "sparks": ("float", 0.12, 0.0, 0.5, 0.01),

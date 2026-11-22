@@ -1,12 +1,13 @@
 import numpy as np
 
-from glediator.effects.support import ConfiguredEffect, aurora_coordinates, AURORA_SETTINGS
+from glediator.effects.support import AURORA_SETTINGS, ConfiguredEffect, aurora_coordinates
 from glediator.generators.palettes import colorize
 
 
 class FireKozEffect(ConfiguredEffect):
     name = "FireKoz"
     description = "A stylized animated fire pattern."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

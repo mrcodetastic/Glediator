@@ -6,6 +6,7 @@ from glediator.effects.support import AURORA_SETTINGS, ConfiguredEffect
 class TestPatternEffect(ConfiguredEffect):
     name = "Test"
     description = "A solid-color test frame."
+    category = "Utility"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

@@ -4,6 +4,7 @@ from glediator.effects.support import ConfiguredEffect, capture_screen, close_ca
 class ScreenCaptureEffect(ConfiguredEffect):
     name = "Screen Capture"
     description = "Capture and scale a selected screen region."
+    category = "Capture"
     settings = {
         "monitor": ("int", 1, 1, 16, 1),
         "x": ("int", 0, 0, 8192, 1),

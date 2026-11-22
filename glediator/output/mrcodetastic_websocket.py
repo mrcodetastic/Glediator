@@ -7,16 +7,15 @@ import time
 import numpy as np
 
 from glediator.core.frame import to_rgb565
-from glediator.mapper import map_frame
 
 
 class MrCodetasticWebSocketOutput:
-    """Send one complete RGB565 frame per WebSocket binary message."""
+    """Send one complete row-major RGB565 frame per WebSocket binary message."""
 
     FRAME_MARKER = b"\x81\x81"
 
-    def __init__(self, url: str, mapping: str = "horizontal-snake") -> None:
-        self.url, self.mapping = url, mapping
+    def __init__(self, url: str) -> None:
+        self.url = url
         self._queue: queue.Queue[np.ndarray | None] = queue.Queue(maxsize=2)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -37,7 +36,7 @@ class MrCodetasticWebSocketOutput:
             self._queue.put_nowait(None)
         except queue.Full:
             pass
-        if self._thread:
+        if self._thread and self._thread is not threading.current_thread():
             self._thread.join(timeout=2)
 
     def send(self, frame: np.ndarray) -> None:
@@ -55,8 +54,6 @@ class MrCodetasticWebSocketOutput:
                 pass
 
     def _worker(self) -> None:
-        # Keep packet encoding and core tests usable when optional app dependencies
-        # have not yet been installed; the runtime dependency is declared in pyproject.
         from websockets.sync.client import connect
 
         while not self._stop.is_set():
@@ -65,7 +62,6 @@ class MrCodetasticWebSocketOutput:
                     self.connected = True
                     self.last_error = ""
                     last_sent_frame = None
-                    last_sent_mapping = None
                     while not self._stop.is_set():
                         try:
                             frame = self._queue.get(timeout=0.2)
@@ -73,12 +69,10 @@ class MrCodetasticWebSocketOutput:
                             continue
                         if frame is None:
                             break
-                        mapping = self.mapping
-                        if self._frames_match(frame, last_sent_frame) and mapping == last_sent_mapping:
+                        if self._frames_match(frame, last_sent_frame):
                             continue
-                        websocket.send(self.encode_frame(frame, mapping))
+                        websocket.send(self.encode_frame(frame))
                         last_sent_frame = frame
-                        last_sent_mapping = mapping
             except Exception as exc:  # Network failures should never stop rendering.
                 self.connected = False
                 self.last_error = str(exc)
@@ -91,7 +85,8 @@ class MrCodetasticWebSocketOutput:
         return previous is not None and frame.shape == previous.shape and np.array_equal(frame, previous)
 
     @classmethod
-    def encode_frame(cls, frame: np.ndarray, mapping: str = "horizontal-snake") -> bytes:
+    def encode_frame(cls, frame: np.ndarray) -> bytes:
         """Encode marker 0x81 0x81 followed by row-major RGB565 big-endian pixels."""
-        pixels = to_rgb565(map_frame(frame, mapping)).reshape(-1)
+        contiguous = np.ascontiguousarray(frame, dtype=np.uint8)
+        pixels = to_rgb565(contiguous).reshape(-1)
         return cls.FRAME_MARKER + pixels.astype(">u2", copy=False).tobytes()

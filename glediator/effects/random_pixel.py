@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class RandomPixelEffect(ConfiguredEffect):
     name = "Random Pixel"
     description = "Randomly spawned pixels that fade over time."
+    category = "Generative"
     settings = {
         "spawn_rate": ("int", 22, 1, 500, 1),
         "fade_duration": ("float", 1.8, 0.1, 15.0, 0.1),

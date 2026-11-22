@@ -15,11 +15,13 @@
 #define PANEL_WIDTH 64
 #define PANEL_HEIGHT 32
 #define PANEL_CHAIN 1
+#define MATRIX_WIDTH (PANEL_WIDTH * PANEL_CHAIN)
+#define MATRIX_HEIGHT PANEL_HEIGHT
 
 // WebSocketsServer uses a compile-time receive buffer. Set it large enough
 // for the complete (unfragmented) frame message, including its two marker bytes.
 #ifndef WEBSOCKETS_MAX_DATA_SIZE
-#define WEBSOCKETS_MAX_DATA_SIZE (PANEL_WIDTH * PANEL_HEIGHT * 2 + 2)
+#define WEBSOCKETS_MAX_DATA_SIZE (MATRIX_WIDTH * MATRIX_HEIGHT * 2 + 2)
 #endif
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
@@ -35,15 +37,18 @@ constexpr uint16_t DISCOVERY_PORT = 20586;
 constexpr uint8_t FRAME_MARKER = 0x81;
 
 
-constexpr size_t FRAME_PIXELS = PANEL_WIDTH * PANEL_HEIGHT;
+constexpr size_t FRAME_PIXELS = MATRIX_WIDTH * MATRIX_HEIGHT;
 constexpr size_t FRAME_BYTES = FRAME_PIXELS * sizeof(uint16_t);
 constexpr size_t MESSAGE_BYTES = FRAME_BYTES + 2;
 
 MatrixPanel_I2S_DMA *display = nullptr;
 WebSocketsServer webSocket(WEBSOCKET_PORT);
 WiFiUDP discoveryUdp;
-std::array<uint16_t, FRAME_PIXELS> pendingFrame{};
-bool framePending = false;
+std::array<uint16_t, FRAME_PIXELS> stagingFrames[2]{};
+std::array<uint16_t, FRAME_PIXELS> drawBuffer{};
+volatile uint8_t readyBufferIdx = 0;
+volatile bool framePending = false;
+portMUX_TYPE frameMux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t lastDiscoveryMs = 0;
 uint32_t lastFlipUs = 0;
 uint32_t rejectedFrameCount = 0;
@@ -68,14 +73,20 @@ static void reportWebSocketEvent(uint8_t clientId, WStype_t type, uint8_t *paylo
         return;
       }
 
-      // Buffer only after validating the whole WebSocket message. The HUB75
-      // DMA buffer is not touched until the full frame has arrived.
-      for (size_t i = 0; i < FRAME_PIXELS; ++i) {
-        const size_t offset = 2 + i * 2;
-        pendingFrame[i] = (static_cast<uint16_t>(payload[offset]) << 8) |
-                          static_cast<uint16_t>(payload[offset + 1]);
+      // Buffer only after validating the whole WebSocket message. Write into the
+      // inactive staging slot, then atomically publish it for the render loop.
+      {
+        const uint8_t writeIdx = readyBufferIdx ^ 1;
+        for (size_t i = 0; i < FRAME_PIXELS; ++i) {
+          const size_t offset = 2 + i * 2;
+          stagingFrames[writeIdx][i] = (static_cast<uint16_t>(payload[offset]) << 8) |
+                                       static_cast<uint16_t>(payload[offset + 1]);
+        }
+        portENTER_CRITICAL(&frameMux);
+        readyBufferIdx = writeIdx;
+        framePending = true;
+        portEXIT_CRITICAL(&frameMux);
       }
-      framePending = true;
       break;
     default:
       break;
@@ -83,14 +94,22 @@ static void reportWebSocketEvent(uint8_t clientId, WStype_t type, uint8_t *paylo
 }
 
 static void displayPendingFrame() {
-  if (!framePending || display == nullptr) return;
-  framePending = false;
+  if (display == nullptr) return;
+  portENTER_CRITICAL(&frameMux);
+  const bool hasFrame = framePending;
+  if (hasFrame) {
+    drawBuffer = stagingFrames[readyBufferIdx];
+    framePending = false;
+  }
+  portEXIT_CRITICAL(&frameMux);
+  if (!hasFrame) return;
 
   // The driver is configured for double buffering. Draw the complete frame
   // into the non-visible buffer first; no partial network frame is displayed.
   for (size_t i = 0; i < FRAME_PIXELS; ++i) {
-    int16_t x, y;
-    display->drawPixel(x, y, pendingFrame[i]);
+    const int16_t x = static_cast<int16_t>(i % MATRIX_WIDTH);
+    const int16_t y = static_cast<int16_t>(i / MATRIX_WIDTH);
+    display->drawPixel(x, y, drawBuffer[i]);
   }
 
   // Avoid flipping faster than the panel's calculated scan refresh rate.

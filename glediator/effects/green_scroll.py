@@ -7,6 +7,7 @@ from glediator.generators.palettes import colorize
 class GreenScrollEffect(ConfiguredEffect):
     name = "Green Scroll"
     description = "Columns of scrolling green digital rain."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

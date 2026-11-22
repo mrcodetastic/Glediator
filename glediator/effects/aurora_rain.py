@@ -7,6 +7,7 @@ from glediator.generators.palettes import colorize
 class AuroraRainEffect(ConfiguredEffect):
     name = "Aurora Rain"
     description = "A colored vertical rain effect."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

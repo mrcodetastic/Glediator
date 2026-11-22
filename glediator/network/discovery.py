@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import queue
 import socket
 import threading
-import queue
+
 
 class DeviceDiscovery:
     """Listen for MrCodeTastic UDP discovery beacons without blocking the UI."""
@@ -60,7 +61,7 @@ class DeviceDiscovery:
             while not self._stop.is_set():
                 try:
                     payload, (address, _sender_port) = sock.recvfrom(2048)
-                except socket.timeout:
+                except TimeoutError:
                     continue
                 except OSError:
                     if not self._stop.is_set():

@@ -2,9 +2,11 @@ import numpy as np
 
 from glediator.effects.support import ConfiguredEffect
 
+
 class KnightRiderEffect(ConfiguredEffect):
     name = "Knight Rider"
     description = "A red scanner bar with a soft trail."
+    category = "Generative"
     settings = {"speed": ("float", 1.7, 0.1, 8.0, 0.1), "trail": ("float", 0.11, 0.02, 0.5, 0.01)}
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

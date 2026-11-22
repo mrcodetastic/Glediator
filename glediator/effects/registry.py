@@ -5,17 +5,22 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
-from typing import Type
 
 from glediator.effects.base import Effect
 
+_EFFECT_CLASSES: dict[str, type[Effect]] = {}
+_LOADED = False
 
-_EFFECT_CLASSES: dict[str, Type[Effect]] = {}
 
-
-def load_effects() -> dict[str, Type[Effect]]:
+def load_effects(reload: bool = False) -> dict[str, type[Effect]]:
     """Import effect modules and index their concrete Effect subclasses."""
+    global _LOADED
+    if _LOADED and not reload:
+        return dict(_EFFECT_CLASSES)
+    if reload:
+        _EFFECT_CLASSES.clear()
     package = importlib.import_module("glediator.effects")
+    discovered: dict[str, type[Effect]] = {}
     for module_info in pkgutil.iter_modules(package.__path__):
         if module_info.name.startswith("_") or module_info.name == "registry":
             continue
@@ -27,11 +32,14 @@ def load_effects() -> dict[str, Type[Effect]]:
             description = getattr(candidate, "description", "")
             if not isinstance(name, str) or not name.strip():
                 continue
-            if name in _EFFECT_CLASSES and _EFFECT_CLASSES[name] is not candidate:
+            if name in discovered and discovered[name] is not candidate:
                 raise ValueError(f"Duplicate effect name: {name}")
             if not isinstance(description, str):
                 raise TypeError(f"Effect {name!r} must provide a string description")
-            _EFFECT_CLASSES[name] = candidate
+            discovered[name] = candidate
+    for name in sorted(discovered, key=str.casefold):
+        _EFFECT_CLASSES[name] = discovered[name]
+    _LOADED = True
     return dict(_EFFECT_CLASSES)
 
 
@@ -39,8 +47,16 @@ def effect_names() -> list[str]:
     return list(load_effects())
 
 
+def picker_effect_names() -> list[str]:
+    return [name for name in load_effects() if name != "Black"]
+
+
 def effect_descriptions() -> dict[str, str]:
     return {name: cls.description for name, cls in load_effects().items()}
+
+
+def effect_categories() -> dict[str, str]:
+    return {name: getattr(cls, "category", "General") for name, cls in load_effects().items()}
 
 
 def effect_settings(name: str) -> dict:
@@ -65,8 +81,6 @@ def sanitize_effect_parameters(name: str, values: dict | None) -> dict:
     schema = effect_settings(name)
     if schema:
         return sanitize_parameters(name, values, schema)
-    # Effects without a UI schema own their validation in configure(); keep
-    # JSON-style values intact so their configuration survives save/restore.
     return dict(values) if isinstance(values, dict) else {}
 
 
@@ -77,4 +91,3 @@ def create_effect(name: str) -> Effect:
     instance = effect_class()
     instance.setup()
     return instance
-

@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class GridEffect(ConfiguredEffect):
     name = "Grid"
     description = "Animated neon grid lines."
+    category = "Generative"
     settings = {
         "spacing": ("int", 8, 2, 32, 1),
         "speed": ("float", 3.0, 0.0, 20.0, 0.5),

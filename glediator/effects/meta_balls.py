@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class MetaBallsEffect(ConfiguredEffect):
     name = "Meta Balls"
     description = "Soft, moving metaballs merged into a single field."
+    category = "Generative"
     settings = {
         "count": ("int", 4, 1, 8, 1),
         "speed": ("float", 0.7, 0.1, 3.0, 0.1),

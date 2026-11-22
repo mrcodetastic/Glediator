@@ -6,8 +6,7 @@ import numpy as np
 
 from glediator.core.frame import new_frame
 from glediator.core.pipeline import apply_filter, mix
-from glediator.effects import (create_effect, default_effect_parameters, effect_names,
-                               sanitize_effect_parameters)
+from glediator.effects import create_effect, default_effect_parameters, effect_names, sanitize_effect_parameters
 
 
 @dataclass
@@ -27,7 +26,10 @@ class Scene:
     def __init__(self, name: str, width: int = 64, height: int = 32) -> None:
         self.name = name
         self.width, self.height = width, height
-        self.layers = [Layer(generator_name="Plasma" if i == 0 else "Black", enabled=(i == 0), configured=(i == 0)) for i in range(5)]
+        self.layers = [
+            Layer(generator_name="Plasma" if i == 0 else "Black", enabled=(i == 0), configured=(i == 0))
+            for i in range(5)
+        ]
         self._generators = [create_effect(layer.generator_name) for layer in self.layers]
         self.active_layer = 0
         self._frame = new_frame(width, height)
@@ -65,12 +67,15 @@ class Scene:
         if source == destination:
             return
         self.layers[source], self.layers[destination] = self.layers[destination], self.layers[source]
-        self._generators[source], self._generators[destination] = self._generators[destination], self._generators[source]
+        self._generators[source], self._generators[destination] = (
+            self._generators[destination],
+            self._generators[source],
+        )
 
     def render(self, time_seconds: float, audio_state: dict | None = None) -> np.ndarray:
         self._frame.fill(0)
         has_layer = False
-        for layer, generator in zip(self.layers, self._generators):
+        for layer, generator in zip(self.layers, self._generators, strict=True):
             if not layer.enabled:
                 continue
             image = generator.drawFrame(self.width, self.height, time_seconds, audio_state)
@@ -116,8 +121,16 @@ class Scene:
                 enabled=bool(saved.get("enabled", index == 0)),
                 configured=bool(saved.get("configured", saved.get("enabled", index == 0) or name != "Black")),
                 brightness=max(0, min(100, int(saved.get("brightness", 100)))),
-                filter_name=saved.get("filter", "None") if saved.get("filter") in ("None", "Invert", "Monochrome", "Threshold") else "None",
-                mix_mode=saved.get("mix_mode", "Add") if saved.get("mix_mode") in ("Add", "Subtract", "Multiply", "Difference", "Screen", "Maximum") else "Add",
+                filter_name=(
+                    saved.get("filter", "None")
+                    if saved.get("filter") in ("None", "Invert", "Monochrome", "Threshold")
+                    else "None"
+                ),
+                mix_mode=(
+                    saved.get("mix_mode", "Add")
+                    if saved.get("mix_mode") in ("Add", "Subtract", "Multiply", "Difference", "Screen", "Maximum")
+                    else "Add"
+                ),
                 parameters=parameters,
             )
 

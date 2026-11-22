@@ -7,6 +7,7 @@ from glediator.generators.palettes import colorize
 class AuroraWaveEffect(ConfiguredEffect):
     name = "Aurora Wave"
     description = "Layered flowing aurora waves."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

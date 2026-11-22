@@ -14,7 +14,7 @@ Open `esp32-firmware.ino` in Arduino IDE. Edit `WIFI_SSID` and `WIFI_PASSWORD`, 
 
 ## Panel and pixel order
 
-The defaults are one 64×32 panel. Set `PANEL_WIDTH`, `PANEL_HEIGHT`, and `PANEL_CHAIN` to match the physical setup and the Python app's **File → LED Panel Config** dimensions. The default `INPUT_PIXEL_ORDER` is `HorizontalSnake`, matching the app's default pixel mapping. It can be changed to `HorizontalLines`, `VerticalLines`, or `VerticalSnake` to match the app selection.
+The defaults are one 64×32 panel. Set `PANEL_WIDTH`, `PANEL_HEIGHT`, and `PANEL_CHAIN` to match the physical setup and the Python app's **File → LED Panel Config** dimensions (`MATRIX_WIDTH = PANEL_WIDTH * PANEL_CHAIN`). The Python app always sends pixels in row-major order from `(0, 0)` to `(W - 1, H - 1)`; any physical panel chaining or wiring layout is handled in the ESP32 firmware.
 
 For dimensions larger than the default, the sketch raises `WEBSOCKETS_MAX_DATA_SIZE` to fit one complete frame message. The WebSockets library and ESP32 heap must support a message of `2 + width × height × 2` bytes; for example, 128×128 needs 32,770 bytes.
 
@@ -22,7 +22,7 @@ For dimensions larger than the default, the sketch raises `WEBSOCKETS_MAX_DATA_S
 
 - The ESP32 advertises `_ws._tcp` via mDNS as `codetastic-panel.local` and periodically broadcasts the exact UDP payload `CODETASTIC` to port **20586**.
 - It accepts WebSocket connections on port **12345**.
-- Each binary WebSocket message must be exactly `0x81 0x81` followed by `width × height` RGB565 pixels, high byte first. The sketch rejects frames with a wrong marker or byte count.
+- Each binary WebSocket message must be exactly `0x81 0x81` followed by `width × height` row-major RGB565 pixels, high byte first. The sketch rejects frames with a wrong marker or byte count.
 - The complete frame is decoded into a staging array, copied to the HUB75 back buffer, and displayed with `flipDMABuffer()` only after all pixels are ready. No incomplete network frame is presented.
 
 The sketch has no authentication and is intended for a trusted local network. Open TCP port 12345 and allow UDP broadcast on port 20586 through the LAN firewall.

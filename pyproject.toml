@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = ["numpy>=1.26", "PySide6>=6.6", "Pillow>=10.0", "websockets>=12.0", "mss>=9.0", "soundcard>=0.4.3"]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "ruff>=0.3"]
+dev = ["pytest>=7.0", "pytest-qt>=4.4", "ruff>=0.3"]
 
 [project.scripts]
 glediator = "glediator.app:main"
@@ -18,5 +18,16 @@ glediator = "glediator.app:main"
 [tool.setuptools.packages.find]
 include = ["glediator*"]
 
+[tool.setuptools.package-data]
+"glediator.assets.fonts" = ["*.ttf"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "RUF"]
+ignore = ["RUF012", "RUF001"]

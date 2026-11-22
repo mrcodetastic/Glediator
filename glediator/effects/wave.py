@@ -7,13 +7,14 @@ from glediator.generators.palettes import PALETTE_NAMES, blend_colors, colorize,
 class WaveEffect(ConfiguredEffect):
     name = "Wave"
     description = "A glowing, configurable travelling wave."
+    category = "Generative"
     settings = {
         "amplitude": ("float", 0.28, 0.0, 0.48, 0.01),
         "frequency": ("float", 1.25, 0.1, 8.0, 0.05),
         "position": ("float", 0.5, 0.0, 1.0, 0.01),
         "thickness": ("float", 0.10, 0.02, 0.4, 0.01),
         "speed": ("float", 2.0, 0.0, 10.0, 0.1),
-        "palette": ("choice", "Aurora", PALETTE_NAMES + ("Custom",), "", ""),
+        "palette": ("choice", "Aurora", (*PALETTE_NAMES, "Custom"), "", ""),
         "color_a": ("color", "#35D9FF", "", "", ""),
         "color_b": ("color", "#FF58BD", "", "", ""),
         "background": ("color", "#030714", "", "", ""),

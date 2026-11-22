@@ -69,8 +69,10 @@ class FramePreview(QGroupBox):
         # a few pixels off the target ratio; with the aspect-aware size hint it is
         # normally an exact fit.
         scaled = QPixmap.fromImage(self._source_image).scaled(
-            self.image.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-            Qt.TransformationMode.SmoothTransformation)
+            self.image.size(),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.FastTransformation,
+        )
         x = max(0, (scaled.width() - self.image.width()) // 2)
         y = max(0, (scaled.height() - self.image.height()) // 2)
         self.image.setPixmap(scaled.copy(x, y, self.image.width(), self.image.height()))

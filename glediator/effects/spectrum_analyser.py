@@ -6,6 +6,7 @@ from glediator.effects.support import ConfiguredEffect
 class SpectrumAnalyserEffect(ConfiguredEffect):
     name = "Spectrum Analyser"
     description = "Configurable audio-frequency bars, averaged from a 1024-bin FFT."
+    category = "Audio"
     settings = {
         "sensitivity": ("float", 4.0, 0.2, 12.0, 0.1),
         "auto_sensitivity": ("choice", "Off", ("Off", "On"), "", ""),
@@ -25,7 +26,7 @@ class SpectrumAnalyserEffect(ConfiguredEffect):
         starts = np.floor(boundaries[:-1]).astype(int)
         ends = np.ceil(boundaries[1:]).astype(int)
         result = np.zeros(count, dtype=np.float32)
-        for i, (start, end) in enumerate(zip(starts, ends)):
+        for i, (start, end) in enumerate(zip(starts, ends, strict=True)):
             start = min(max(0, start), spectrum.size - 1)
             end = min(spectrum.size, max(start + 1, end))
             result[i] = float(np.mean(spectrum[start:end]))

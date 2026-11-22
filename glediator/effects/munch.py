@@ -7,6 +7,7 @@ from glediator.generators.palettes import colorize
 class MunchEffect(ConfiguredEffect):
     name = "Munch"
     description = "A moving XOR-based Munch pattern."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

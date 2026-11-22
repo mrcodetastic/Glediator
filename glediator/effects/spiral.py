@@ -1,12 +1,13 @@
 import numpy as np
 
-from glediator.effects.support import ConfiguredEffect, aurora_coordinates, AURORA_SETTINGS
+from glediator.effects.support import AURORA_SETTINGS, ConfiguredEffect, aurora_coordinates
 from glediator.generators.palettes import colorize
 
 
 class SpiralEffect(ConfiguredEffect):
     name = "Spiral"
     description = "An animated spiral field."
+    category = "Aurora"
     settings = AURORA_SETTINGS
 
     def drawFrame(self, width, height, time_seconds, audio_state=None):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 
-
 PALETTES: dict[str, tuple[tuple[int, int, int], ...]] = {
     "Aurora": ((2, 8, 24), (4, 55, 91), (22, 174, 139), (126, 255, 153), (245, 255, 220)),
     "Fire": ((10, 0, 0), (125, 12, 0), (255, 65, 0), (255, 190, 12), (255, 255, 210)),

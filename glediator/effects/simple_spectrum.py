@@ -1,12 +1,13 @@
 import numpy as np
 
-from glediator.effects.support import ConfiguredEffect, coordinates
+from glediator.effects.support import ConfiguredEffect
 from glediator.generators.palettes import PALETTE_NAMES
 
 
 class SimpleSpectrumEffect(ConfiguredEffect):
     name = "Simple Spectrum"
     description = "Audio-frequency spectrum bars."
+    category = "Audio"
     settings = {
         "sensitivity": ("float", 4.0, 0.2, 12.0, 0.1),
         "source": ("choice", "System Output", ("System Output", "Microphone"), "", ""),

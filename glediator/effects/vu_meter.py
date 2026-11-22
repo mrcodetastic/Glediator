@@ -6,6 +6,7 @@ from glediator.effects.support import ConfiguredEffect
 class VUMeterEffect(ConfiguredEffect):
     name = "VU Meter"
     description = "Audio-level meter with a peak indicator."
+    category = "Audio"
     settings = {
         "sensitivity": ("float", 2.5, 0.2, 8.0, 0.1),
         "auto_sensitivity": ("choice", "Off", ("Off", "On"), "", ""),

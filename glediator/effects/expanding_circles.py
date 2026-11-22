@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class ExpandingCirclesEffect(ConfiguredEffect):
     name = "Expanding Circles"
     description = "Concentric expanding rings."
+    category = "Generative"
     settings = {
         "speed": ("float", 5.0, 0.5, 20.0, 0.5),
         "spacing": ("float", 7.0, 2.0, 20.0, 0.5),

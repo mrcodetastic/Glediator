@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class FadingPixelEffect(ConfiguredEffect):
     name = "Fading Pixel"
     description = "A continuously fading field of colored sparkles."
+    category = "Generative"
     settings = {
         "density": ("float", 0.01, 0.001, 0.1, 0.001),
         "decay": ("float", 0.78, 0.4, 0.99, 0.01),

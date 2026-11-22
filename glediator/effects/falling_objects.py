@@ -7,6 +7,7 @@ from glediator.generators.palettes import PALETTE_NAMES, colorize
 class FallingObjectsEffect(ConfiguredEffect):
     name = "Falling Objects"
     description = "Downward-moving streaks of light."
+    category = "Generative"
     settings = {
         "speed": ("float", 10.0, 1.0, 40.0, 1.0),
         "density": ("float", 1.1, 0.1, 4.0, 0.1),
