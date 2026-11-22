@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import copy
+import time
 from dataclasses import dataclass, field
 
 import numpy as np
 
+from glediator.core.filters import apply_filter_chain, sanitize_filter_chain
 from glediator.core.frame import new_frame
-from glediator.core.pipeline import apply_filter, mix
+from glediator.core.pipeline import LEGACY_FILTERS, MIX_MODES, apply_filter, mix
 from glediator.effects import (
     create_effect,
     default_effect_parameters,
@@ -59,7 +62,9 @@ class Layer:
     enabled: bool = True
     configured: bool = True
     brightness: int = 100
+    opacity: int = 100
     filter_name: str = "None"
+    filters: list[dict] = field(default_factory=list)
     mix_mode: str = "Add"
     parameters: dict = field(default_factory=dict)
     modulations: list[dict] = field(default_factory=list)
@@ -78,12 +83,16 @@ class Scene:
         self._generators = [create_effect(layer.generator_name) for layer in self.layers]
         self._mod_ema: list[dict[str, float]] = [{} for _ in range(5)]
         self._last_applied_params: list[dict | None] = [None for _ in range(5)]
+        self._filter_state: list[dict] = [{} for _ in range(5)]
+        self.layer_times_ms: list[float] = [0.0 for _ in range(5)]
         self.active_layer = 0
         self._frame = new_frame(width, height)
 
     def resize(self, width: int, height: int) -> None:
         self.width, self.height = width, height
         self._frame = new_frame(width, height)
+        for st in self._filter_state:
+            st.clear()
 
     def set_generator(self, index: int, name: str) -> None:
         if name == "Expanding Objects":
@@ -97,6 +106,7 @@ class Scene:
         self.layers[index].modulations = []
         self._mod_ema[index].clear()
         self._last_applied_params[index] = None
+        self._filter_state[index].clear()
         self._generators[index] = create_effect(name)
         self.layers[index].enabled = True
 
@@ -108,12 +118,43 @@ class Scene:
                 return index
         return None
 
+    def duplicate_layer(self, source: int) -> int | None:
+        if not (0 <= source < 5) or not self.layers[source].configured:
+            return None
+        src = self.layers[source]
+        for index, layer in enumerate(self.layers):
+            if not layer.configured:
+                self._generators[index].cleanup()
+                eff = create_effect(src.generator_name)
+                params = copy.deepcopy(src.parameters)
+                eff.configure(params)
+                self._generators[index] = eff
+                self.layers[index] = Layer(
+                    generator_name=src.generator_name,
+                    enabled=src.enabled,
+                    configured=True,
+                    brightness=src.brightness,
+                    opacity=src.opacity,
+                    filter_name=src.filter_name,
+                    filters=copy.deepcopy(src.filters),
+                    mix_mode=src.mix_mode,
+                    parameters=params,
+                    modulations=copy.deepcopy(src.modulations),
+                )
+                self._mod_ema[index].clear()
+                self._last_applied_params[index] = None
+                self._filter_state[index].clear()
+                return index
+        return None
+
     def remove_layer(self, index: int) -> None:
         self._generators[index].cleanup()
         self.layers[index] = Layer(generator_name="Black", enabled=False, configured=False)
         self._generators[index] = create_effect("Black")
         self._mod_ema[index].clear()
         self._last_applied_params[index] = None
+        self._filter_state[index].clear()
+        self.layer_times_ms[index] = 0.0
 
     def move_layer(self, source: int, destination: int) -> None:
         if source == destination:
@@ -127,6 +168,14 @@ class Scene:
         self._last_applied_params[source], self._last_applied_params[destination] = (
             self._last_applied_params[destination],
             self._last_applied_params[source],
+        )
+        self._filter_state[source], self._filter_state[destination] = (
+            self._filter_state[destination],
+            self._filter_state[source],
+        )
+        self.layer_times_ms[source], self.layer_times_ms[destination] = (
+            self.layer_times_ms[destination],
+            self.layer_times_ms[source],
         )
 
     def has_audio_modulation(self) -> bool:
@@ -208,14 +257,23 @@ class Scene:
         has_layer = False
         for index, (layer, generator) in enumerate(zip(self.layers, self._generators, strict=True)):
             if not layer.enabled:
+                self.layer_times_ms[index] = 0.0
                 continue
+            t0 = time.perf_counter()
             self._apply_modulations(index, layer, generator, audio_state, mod_context)
             image = generator.drawFrame(self.width, self.height, time_seconds, audio_state)
-            image = apply_filter(image, layer.filter_name)
+            if layer.filters:
+                image = apply_filter_chain(image, layer.filters, time_seconds, self._filter_state[index])
+            elif layer.filter_name != "None":
+                image = apply_filter(image, layer.filter_name)
             if layer.brightness != 100:
                 image = np.clip(image.astype(np.float32) * (layer.brightness / 100.0), 0, 255).astype(np.uint8)
-            self._frame[:] = image if not has_layer else mix(self._frame, image, layer.mix_mode)
+            mode = layer.mix_mode if has_layer else "Normal"
+            self._frame[:] = mix(self._frame, image, mode, layer.opacity)
             has_layer = True
+            ms = (time.perf_counter() - t0) * 1000.0
+            prev_ms = self.layer_times_ms[index]
+            self.layer_times_ms[index] = ms if prev_ms == 0.0 else (0.85 * prev_ms + 0.15 * ms)
         return self._frame.copy()
 
     def to_dict(self) -> dict:
@@ -228,7 +286,9 @@ class Scene:
                     "enabled": layer.enabled,
                     "configured": layer.configured,
                     "brightness": layer.brightness,
+                    "opacity": layer.opacity,
                     "filter": layer.filter_name,
+                    "filters": layer.filters,
                     "mix_mode": layer.mix_mode,
                     "parameters": layer.parameters,
                     "modulations": layer.modulations,
@@ -257,21 +317,20 @@ class Scene:
             self._generators[index] = effect
             self._mod_ema[index].clear()
             self._last_applied_params[index] = None
+            self._filter_state[index].clear()
+            legacy_filter = (
+                saved.get("filter", "None") if saved.get("filter") in LEGACY_FILTERS else "None"
+            )
+            filters = sanitize_filter_chain(saved.get("filters"), legacy_filter=legacy_filter)
             self.layers[index] = Layer(
                 generator_name=name,
                 enabled=bool(saved.get("enabled", index == 0)),
                 configured=bool(saved.get("configured", saved.get("enabled", index == 0) or name != "Black")),
                 brightness=max(0, min(100, int(saved.get("brightness", 100)))),
-                filter_name=(
-                    saved.get("filter", "None")
-                    if saved.get("filter") in ("None", "Invert", "Monochrome", "Threshold")
-                    else "None"
-                ),
-                mix_mode=(
-                    saved.get("mix_mode", "Add")
-                    if saved.get("mix_mode") in ("Add", "Subtract", "Multiply", "Difference", "Screen", "Maximum")
-                    else "Add"
-                ),
+                opacity=max(0, min(100, int(saved.get("opacity", 100)))),
+                filter_name=legacy_filter,
+                filters=filters,
+                mix_mode=saved.get("mix_mode", "Add") if saved.get("mix_mode") in MIX_MODES else "Add",
                 parameters=parameters,
                 modulations=sanitize_modulations(name, saved.get("modulations")),
             )

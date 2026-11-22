@@ -2,21 +2,55 @@ from __future__ import annotations
 
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFontComboBox,
     QFormLayout,
+    QHBoxLayout,
     QLineEdit,
+    QPushButton,
     QSpinBox,
     QWidget,
 )
 
+from glediator.generators.palettes import palette_names
 from glediator.ui.widgets.color_button import ColorButton
 
 
-def create_param_editor(kind: str, default, minimum, maximum, step, value) -> QWidget:
+class FilePickerWidget(QWidget):
+    def __init__(self, value: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.line_edit = QLineEdit(value)
+        self.browse_btn = QPushButton("Browse…")
+        self.browse_btn.clicked.connect(self._browse)
+        layout.addWidget(self.line_edit, 1)
+        layout.addWidget(self.browse_btn)
+
+    def _browse(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Choose media file", self.line_edit.text())
+        if path:
+            self.line_edit.setText(path)
+
+    def text(self) -> str:
+        return self.line_edit.text()
+
+    def setText(self, value: str) -> None:
+        self.line_edit.setText(value)
+
+
+def create_param_editor(kind: str, default, minimum, maximum, step, value, *, key: str = "") -> QWidget:
+    if kind == "bool":
+        editor = QCheckBox()
+        editor.setChecked(bool(default if value is None else value))
+        return editor
+    if kind == "file":
+        return FilePickerWidget(str(default if value is None else value))
     if kind == "str":
         return QLineEdit(str(value if value is not None else default))
     if kind == "color":
@@ -27,8 +61,15 @@ def create_param_editor(kind: str, default, minimum, maximum, step, value) -> QW
         return editor
     if kind == "choice":
         editor = QComboBox()
-        choices = minimum() if callable(minimum) else list(minimum)
-        editor.addItems(list(choices))
+        if key == "palette":
+            choices = list(palette_names())
+            if isinstance(minimum, (list, tuple)):
+                for item in minimum:
+                    if item not in choices:
+                        choices.append(item)
+        else:
+            choices = list(minimum() if callable(minimum) else minimum)
+        editor.addItems(choices)
         editor.setCurrentText(str(value if value is not None else default))
         return editor
     if kind == "int":
@@ -46,6 +87,10 @@ def create_param_editor(kind: str, default, minimum, maximum, step, value) -> QW
 
 
 def read_param_editor(editor: QWidget):
+    if isinstance(editor, QCheckBox):
+        return editor.isChecked()
+    if isinstance(editor, FilePickerWidget):
+        return editor.text()
     if isinstance(editor, QLineEdit):
         return editor.text()
     if isinstance(editor, ColorButton):
@@ -67,7 +112,9 @@ class EffectSettingsDialog(QDialog):
         self.editors: dict[str, QWidget] = {}
         for key, spec in schema.items():
             kind, default, minimum, maximum, step = spec
-            editor = create_param_editor(kind, default, minimum, maximum, step, values.get(key, default))
+            editor = create_param_editor(
+                kind, default, minimum, maximum, step, values.get(key, default), key=key
+            )
             self.editors[key] = editor
             label = {
                 "bins": "Bin count (0 = panel width)",

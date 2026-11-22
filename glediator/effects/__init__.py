@@ -9,6 +9,7 @@ from .registry import (
     effect_settings,
     load_effects,
     picker_effect_names,
+    plugin_warnings,
     sanitize_effect_parameters,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "effect_settings",
     "load_effects",
     "picker_effect_names",
+    "plugin_warnings",
     "sanitize_effect_parameters",
 ]

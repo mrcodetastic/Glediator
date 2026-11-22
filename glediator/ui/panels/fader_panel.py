@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -18,6 +18,9 @@ from glediator.core.fader import TRANSITION_KINDS
 
 
 class FaderPanel(QGroupBox):
+    copy_scene_requested = Signal(str, str)
+    swap_scenes_requested = Signal()
+
     def __init__(self, engine: RenderEngine, parent: QWidget | None = None) -> None:
         super().__init__("FINAL OUTPUT & MASTER", parent)
         self.engine = engine
@@ -33,6 +36,18 @@ class FaderPanel(QGroupBox):
         fader_line.addWidget(self.fader_slider, 1)
         fader_line.addWidget(QLabel("B"))
         layout.addLayout(fader_line)
+
+        scene_ops_row = QHBoxLayout()
+        a_to_b = QPushButton("A → B")
+        a_to_b.clicked.connect(lambda: self.copy_scene_requested.emit("left", "right"))
+        swap_btn = QPushButton("Swap A ↔ B")
+        swap_btn.clicked.connect(self.swap_scenes_requested.emit)
+        b_to_a = QPushButton("B → A")
+        b_to_a.clicked.connect(lambda: self.copy_scene_requested.emit("right", "left"))
+        scene_ops_row.addWidget(a_to_b)
+        scene_ops_row.addWidget(swap_btn)
+        scene_ops_row.addWidget(b_to_a)
+        layout.addLayout(scene_ops_row)
 
         trans_row = QHBoxLayout()
         self.transition_combo = QComboBox()

@@ -1,10 +1,8 @@
-"""Compatibility helpers for applying effect-owned parameter schemas.
-
-Settings now live with each effect class. These functions remain available to
-older callers but no longer maintain a separate central effect catalogue.
-"""
+"""Compatibility helpers for applying effect-owned parameter schemas."""
 
 from __future__ import annotations
+
+from glediator.generators.palettes import palette_names
 
 
 def _settings_for(effect_name: str, settings: dict | None) -> dict:
@@ -32,8 +30,19 @@ def sanitize_parameters(effect_name: str, values: dict | None, settings: dict | 
         try:
             if kind in ("str", "font", "color"):
                 result[name] = str(values[name])[:120]
+            elif kind == "file":
+                result[name] = str(values[name])[:512]
+            elif kind == "bool":
+                result[name] = bool(values[name])
             elif kind == "choice":
-                result[name] = values[name] if values[name] in low else default
+                if name == "palette":
+                    allowed = set(palette_names())
+                    if isinstance(low, (tuple, list)):
+                        allowed.update(low)
+                    result[name] = values[name] if values[name] in allowed else default
+                else:
+                    choices = low() if callable(low) else low
+                    result[name] = values[name] if values[name] in choices else default
             elif kind == "int":
                 result[name] = max(low, min(high, int(values[name])))
             else:

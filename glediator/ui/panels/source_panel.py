@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
+    QMenu,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -17,20 +20,20 @@ from PySide6.QtWidgets import (
 )
 
 from glediator.core.engine import RenderEngine
+from glediator.core.pipeline import LEGACY_FILTERS, MIX_MODES
 from glediator.effects import (
-    default_effect_parameters,
     effect_categories,
     effect_descriptions,
-    effect_settings,
     picker_effect_names,
 )
 from glediator.ui.dialogs.effect_picker import EffectPickerDialog
-from glediator.ui.dialogs.effect_settings import EffectSettingsDialog
 
 
 class SourcePanel(QGroupBox):
     status_message = Signal(str)
     layer_selected = Signal(str, int)
+    inspect_requested = Signal(str, int)
+    scene_mutated = Signal(str, dict, dict, str)
 
     def __init__(self, label: str, side: str, engine: RenderEngine, parent: QWidget | None = None) -> None:
         super().__init__(f"SOURCE {label}", parent)
@@ -41,12 +44,17 @@ class SourcePanel(QGroupBox):
         self.list_widget = QListWidget()
         self.list_widget.setMinimumHeight(125)
         self.list_widget.setMaximumHeight(175)
-        self.list_widget.setToolTip("Select an effect to edit it; double-click to open its detailed settings.")
+        self.list_widget.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.list_widget.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.list_widget.setToolTip("Select an effect to inspect; drag to reorder; double-click to focus inspector.")
         self.list_widget.currentItemChanged.connect(lambda _c, _p: self.sync_controls())
         self.list_widget.itemChanged.connect(self._effect_item_changed)
         self.list_widget.itemDoubleClicked.connect(
-            lambda item: self.show_generator_settings(int(item.data(Qt.ItemDataRole.UserRole)))
+            lambda item: self.inspect_requested.emit(self.side, int(item.data(Qt.ItemDataRole.UserRole)))
         )
+        self.list_widget.model().rowsMoved.connect(self._on_rows_moved)
+        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.list_widget)
 
         actions = QHBoxLayout()
@@ -68,14 +76,12 @@ class SourcePanel(QGroupBox):
 
         form = QFormLayout()
         self.filter_combo = QComboBox()
-        self.filter_combo.addItems(["None", "Invert", "Monochrome", "Threshold"])
-        self.filter_combo.currentTextChanged.connect(
-            lambda name: self._update_selected_layer(filter_name=name)
-        )
-        form.addRow("Filter", self.filter_combo)
+        self.filter_combo.addItems(list(LEGACY_FILTERS))
+        self.filter_combo.currentTextChanged.connect(lambda name: self._update_selected_layer(filter_name=name))
+        form.addRow("Quick filter", self.filter_combo)
 
         self.blend_combo = QComboBox()
-        self.blend_combo.addItems(["Add", "Subtract", "Multiply", "Difference", "Screen", "Maximum"])
+        self.blend_combo.addItems(list(MIX_MODES))
         self.blend_combo.currentTextChanged.connect(lambda name: self._update_selected_layer(mix_mode=name))
         form.addRow("Layer blend", self.blend_combo)
 
@@ -86,8 +92,8 @@ class SourcePanel(QGroupBox):
         self.brightness_spin.valueChanged.connect(lambda value: self._update_selected_layer(brightness=value))
         form.addRow("Brightness", self.brightness_spin)
 
-        self.settings_button = QPushButton("Effect settings…")
-        self.settings_button.clicked.connect(self._edit_selected_effect)
+        self.settings_button = QPushButton("Inspect layer…")
+        self.settings_button.clicked.connect(self._inspect_selected)
         form.addRow(self.settings_button)
         layout.addLayout(form)
 
@@ -143,9 +149,7 @@ class SourcePanel(QGroupBox):
             item = QListWidgetItem(f"Layer {layer_index + 1}  ·  {layer.get('generator', 'Black')}")
             item.setData(Qt.ItemDataRole.UserRole, layer_index)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(
-                Qt.CheckState.Checked if layer.get("enabled", True) else Qt.CheckState.Unchecked
-            )
+            item.setCheckState(Qt.CheckState.Checked if layer.get("enabled", True) else Qt.CheckState.Unchecked)
             self.list_widget.addItem(item)
             if layer_index == selected_layer:
                 row_to_select = self.list_widget.count() - 1
@@ -156,16 +160,26 @@ class SourcePanel(QGroupBox):
 
     def _effect_item_changed(self, item: QListWidgetItem) -> None:
         layer_index = int(item.data(Qt.ItemDataRole.UserRole))
+        before = self.engine.scene_snapshot(self.side)
         self.engine.set_layer_enabled(self.side, layer_index, item.checkState() == Qt.CheckState.Checked)
+        after = self.engine.scene_snapshot(self.side)
+        self.scene_mutated.emit(self.side, before, after, "Toggle layer")
 
     def _update_selected_layer(self, **options) -> None:
         index = self.selected_layer()
         if index is not None:
+            before = self.engine.scene_snapshot(self.side)
             self.engine.set_layer_options(self.side, index, **options)
+            after = self.engine.scene_snapshot(self.side)
+            self.scene_mutated.emit(self.side, before, after, "Update layer options")
+            self.layer_selected.emit(self.side, index)
 
     def add_effect_by_name(self, name: str) -> int | None:
+        before = self.engine.scene_snapshot(self.side)
         index = self.engine.add_layer(self.side, name)
         if index is not None:
+            after = self.engine.scene_snapshot(self.side)
+            self.scene_mutated.emit(self.side, before, after, f"Add {name}")
             self.refresh_effect_list(index)
         return index
 
@@ -183,11 +197,27 @@ class SourcePanel(QGroupBox):
             return
         self.add_effect_by_name(picker.selected_effect)
 
+    def duplicate_effect(self) -> None:
+        index = self.selected_layer()
+        if index is None:
+            return
+        before = self.engine.scene_snapshot(self.side)
+        new_idx = self.engine.duplicate_layer(self.side, index)
+        if new_idx is None:
+            self.status_message.emit("All 5 layer slots are in use")
+            return
+        after = self.engine.scene_snapshot(self.side)
+        self.scene_mutated.emit(self.side, before, after, "Duplicate layer")
+        self.refresh_effect_list(new_idx)
+
     def remove_effect(self) -> None:
         index = self.selected_layer()
         if index is None:
             return
+        before = self.engine.scene_snapshot(self.side)
         self.engine.remove_layer(self.side, index)
+        after = self.engine.scene_snapshot(self.side)
+        self.scene_mutated.emit(self.side, before, after, "Remove layer")
         self.refresh_effect_list()
 
     def move_effect(self, direction: int) -> None:
@@ -197,34 +227,64 @@ class SourcePanel(QGroupBox):
             return
         source = int(self.list_widget.item(row).data(Qt.ItemDataRole.UserRole))
         target = int(self.list_widget.item(target_row).data(Qt.ItemDataRole.UserRole))
+        before = self.engine.scene_snapshot(self.side)
         self.engine.move_layer(self.side, source, target)
+        after = self.engine.scene_snapshot(self.side)
+        self.scene_mutated.emit(self.side, before, after, "Reorder layer")
         self.refresh_effect_list(target)
 
-    def _edit_selected_effect(self) -> None:
+    def _on_rows_moved(self, _parent, start: int, _end: int, _dest, dest_row: int) -> None:
+        # Apply drag-and-drop reorder to the underlying scene slots
+        target_row = dest_row - 1 if dest_row > start else dest_row
+        if target_row == start or not (0 <= target_row < self.list_widget.count()):
+            return
+        new_order = [
+            int(self.list_widget.item(i).data(Qt.ItemDataRole.UserRole))
+            for i in range(self.list_widget.count())
+        ]
+        before = self.engine.scene_snapshot(self.side)
+        old_layers = before.get("layers", [])
+        rebuilt = [old_layers[idx] for idx in new_order] + [
+            layer for i, layer in enumerate(old_layers) if i not in new_order
+        ]
+        after_state = dict(before, layers=rebuilt)
+        self.engine.load_scene_state(self.side, after_state)
+        after = self.engine.scene_snapshot(self.side)
+        self.scene_mutated.emit(self.side, before, after, "Drag reorder layer")
+        self.refresh_effect_list(target_row)
+
+    def _show_context_menu(self, pos) -> None:
+        menu = QMenu(self)
+        has_sel = self.selected_layer() is not None
+        dup_act = QAction("Duplicate layer", menu)
+        dup_act.setEnabled(has_sel)
+        dup_act.triggered.connect(self.duplicate_effect)
+        up_act = QAction("Move up", menu)
+        up_act.setEnabled(self.up_button.isEnabled())
+        up_act.triggered.connect(lambda: self.move_effect(-1))
+        down_act = QAction("Move down", menu)
+        down_act.setEnabled(self.down_button.isEnabled())
+        down_act.triggered.connect(lambda: self.move_effect(1))
+        rem_act = QAction("Remove", menu)
+        rem_act.setEnabled(has_sel)
+        rem_act.triggered.connect(self.remove_effect)
+        rename_act = QAction("Rename source…", menu)
+        rename_act.triggered.connect(self._rename_source)
+        menu.addAction(dup_act)
+        menu.addAction(up_act)
+        menu.addAction(down_act)
+        menu.addAction(rem_act)
+        menu.addSeparator()
+        menu.addAction(rename_act)
+        menu.exec(self.list_widget.mapToGlobal(pos))
+
+    def _rename_source(self) -> None:
+        snap = self.engine.scene_snapshot(self.side)
+        name, ok = QInputDialog.getText(self, "Rename Source", "Source name:", text=str(snap.get("name", "")))
+        if ok and name.strip():
+            self.engine.rename_scene(self.side, name.strip())
+
+    def _inspect_selected(self) -> None:
         index = self.selected_layer()
         if index is not None:
-            self.show_generator_settings(index)
-
-    def show_generator_settings(self, layer_index: int) -> None:
-        scene = self.engine.scene_snapshot(self.side)
-        layers = scene.get("layers", [])
-        if not (0 <= layer_index < len(layers)):
-            return
-        layer = layers[layer_index]
-        gen_name = layer.get("generator", "Black")
-        schema = effect_settings(gen_name)
-        if not schema:
-            QMessageBox.information(self, "Effect settings", f"{gen_name} has no adjustable parameters.")
-            return
-        values = default_effect_parameters(gen_name)
-        values.update(layer.get("parameters", {}))
-        dialog = EffectSettingsDialog(
-            self,
-            f"{gen_name} settings · {self.side.upper()} / Layer {layer_index + 1}",
-            schema,
-            values,
-        )
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        self.engine.set_generator_parameters(self.side, layer_index, dialog.values())
-        self.status_message.emit(f"Updated {gen_name} settings")
+            self.inspect_requested.emit(self.side, index)

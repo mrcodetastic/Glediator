@@ -81,8 +81,18 @@ class RenderEngine:
             config.master.get("brightness", 1.0),
             config.master.get("gamma", 1.0),
         )
+        from glediator.generators.palettes import set_custom_palettes
+
+        set_custom_palettes(config.palettes)
         if config.live_state:
             self.restore_state(config.live_state)
+
+    def set_palettes(self, palettes: dict[str, list[str]]) -> None:
+        from glediator.generators.palettes import set_custom_palettes
+
+        with self._lock:
+            self.config.palettes = dict(palettes)
+            set_custom_palettes(self.config.palettes)
 
     def set_master(
         self,
@@ -137,6 +147,10 @@ class RenderEngine:
         with self._lock:
             return self._scene(side).add_layer(name)
 
+    def duplicate_layer(self, side: str, layer: int) -> int | None:
+        with self._lock:
+            return self._scene(side).duplicate_layer(layer)
+
     def remove_layer(self, side: str, layer: int) -> None:
         with self._lock:
             self._scene(side).remove_layer(layer)
@@ -150,6 +164,29 @@ class RenderEngine:
     def move_layer(self, side: str, source: int, destination: int) -> None:
         with self._lock:
             self._scene(side).move_layer(source, destination)
+
+    def copy_scene(self, src_side: str, dst_side: str) -> None:
+        with self._lock:
+            data = copy.deepcopy(self._scene(src_side).to_dict())
+            data["name"] = self._scene(dst_side).name
+            self._scene(dst_side).restore(data)
+
+    def swap_scenes(self) -> None:
+        with self._lock:
+            left_data = copy.deepcopy(self.left_scene.to_dict())
+            right_data = copy.deepcopy(self.right_scene.to_dict())
+            left_name, right_name = self.left_scene.name, self.right_scene.name
+            right_data["name"] = left_name
+            left_data["name"] = right_name
+            self.left_scene.restore(right_data)
+            self.right_scene.restore(left_data)
+
+    def rename_scene(self, side: str, name: str) -> None:
+        cleaned = str(name).strip()
+        if not cleaned:
+            return
+        with self._lock:
+            self._scene(side).name = cleaned
 
     def set_fader(self, amount: float, *, cancel_transition: bool = True) -> None:
         with self._lock:
@@ -197,15 +234,28 @@ class RenderEngine:
         side: str,
         layer: int,
         brightness: int | None = None,
+        opacity: int | None = None,
         filter_name: str | None = None,
+        filters: list[dict] | None = None,
         mix_mode: str | None = None,
     ) -> None:
+        from glediator.core.filters import sanitize_filter_chain
+
         with self._lock:
-            item = self._scene(side).layers[layer]
+            scene = self._scene(side)
+            item = scene.layers[layer]
             if brightness is not None:
                 item.brightness = min(100, max(0, int(brightness)))
+            if opacity is not None:
+                item.opacity = min(100, max(0, int(opacity)))
             if filter_name is not None:
                 item.filter_name = filter_name
+                if filters is None:
+                    item.filters = sanitize_filter_chain(None, legacy_filter=filter_name)
+                    scene._filter_state[layer].clear()
+            if filters is not None:
+                item.filters = sanitize_filter_chain(filters)
+                scene._filter_state[layer].clear()
             if mix_mode is not None:
                 item.mix_mode = mix_mode
 
@@ -322,8 +372,11 @@ class RenderEngine:
             frame_count = self.frame_count
             bpm = self.tap_tempo_tracker.bpm if self.bpm_source == "tap" else self._detected_bpm
             layer_errors: dict[tuple[str, int], str] = {}
+            layer_times_ms: dict[tuple[str, int], float] = {}
             for side, scene in (("left", self.left_scene), ("right", self.right_scene)):
                 for index, (layer, generator) in enumerate(zip(scene.layers, scene._generators, strict=True)):
+                    if layer.configured:
+                        layer_times_ms[(side, index)] = scene.layer_times_ms[index]
                     if layer.enabled:
                         err = getattr(generator, "last_error", "")
                         if err:
@@ -342,6 +395,7 @@ class RenderEngine:
                 bpm_source=self.bpm_source,
                 frame_time_ms=self._frame_time_ms,
                 dropped_frames=self._dropped_frames,
+                layer_times_ms=layer_times_ms,
                 layer_errors=layer_errors,
                 audio_error=self.audio_capture.last_error,
                 output_errors=self.outputs.errors(),
