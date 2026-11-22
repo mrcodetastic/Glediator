@@ -56,7 +56,7 @@ Glediator uses a dual-deck live mixer layout:
 
 - **Row-Major Output:** Glediator always sends pixels in plain row-major order from `(0, 0)` to `(W - 1, H - 1)`. Physical panel wiring and chaining belong to the ESP32 receiver firmware ([esp32-firmware](https://github.com/mrcodetastic/Glediator/tree/master/esp32-firmware)).
 - **Panel Size:** Configure matrix dimensions via **File → LED Panel Config…**.
-- **Discovery & Protocol v1/v2:** Glediator listens for UDP `CODETASTIC` beacons on port **20586** and streams RGB565 frames over WebSocket port **12345** ([protocol.md](https://github.com/mrcodetastic/Glediator/blob/master/docs/protocol.md)).
+- **Discovery & Protocol v1/v2:** Glediator listens for UDP `CODETASTIC` beacons on port **20586** and streams 24-bit RGB888 frames over WebSocket port **12345** ([protocol.md](https://github.com/mrcodetastic/Glediator/blob/master/docs/protocol.md)).
   - **v2 receivers** report their name, panel size, and capabilities (`delta`, `ack`, `rle`, `brightness`), enabling automatic flow control, delta compression, hardware **Panel brightness**, and one-click **Use device size** on mismatch.
   - Use **Connect manually** for direct IP/host connections; check **Auto** on a device row to reconnect automatically on startup.
 

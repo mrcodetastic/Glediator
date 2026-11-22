@@ -12,7 +12,7 @@ CONFIG_PATH = Path.home() / ".glediator" / "settings.json"
 
 
 def _default_master() -> dict:
-    return {"brightness": 1.0, "gamma": 1.0}
+    return {"brightness": 1.0, "gamma": 1.4}
 
 
 def _default_controls() -> dict:
@@ -146,7 +146,7 @@ class EngineConfig:
             self.master = _default_master()
         self.master = {
             "brightness": max(0.0, min(1.0, float(self.master.get("brightness", 1.0)))),
-            "gamma": max(0.1, min(4.0, float(self.master.get("gamma", 1.0)))),
+            "gamma": max(0.1, min(4.0, float(self.master.get("gamma", 1.4)))),
         }
         cleaned_devices: list[dict] = []
         if isinstance(self.devices, list):

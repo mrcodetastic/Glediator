@@ -19,6 +19,6 @@ The Python app always sends pixels in row-major order from `(0, 0)` to `(W - 1, 
 See [`docs/protocol.md`](../docs/protocol.md) for full details:
 
 - Periodically broadcasts a v2 `CODETASTIC {...}` UDP beacon on port **20586**.
-- Accepts WebSocket connections on port **12345** and sends a `hello` JSON packet declaring dimensions and capabilities (`delta`, `ack`, `rle`, `brightness`).
-- Supports `81 81` full frames (v1 & v2), `81 82` delta rectangles, `81 83` RLE frames, `ack` flow-control replies after `flipDMABuffer()`, and `brightness` commands.
+- Accepts WebSocket connections on port **12345** and sends a `hello` JSON packet declaring dimensions and capabilities (`rgb888`, `delta`, `ack`, `rle`, `brightness`).
+- Supports 24-bit RGB888 `81 81` full frames, `81 82` delta rectangles, `81 83` RLE frames, `ack` flow-control replies after `flipDMABuffer()`, and `brightness` commands.
 - Shows the IP address on the panel for 5 seconds at boot and displays `NO SIGNAL` after 5 seconds without incoming frames.

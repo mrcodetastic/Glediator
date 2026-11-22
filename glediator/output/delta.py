@@ -4,7 +4,7 @@ import struct
 
 import numpy as np
 
-from glediator.core.frame import to_rgb565
+from glediator.core.frame import to_rgb888
 
 MARKER_FULL = b"\x81\x81"
 MARKER_DELTA = b"\x81\x82"
@@ -12,10 +12,9 @@ MARKER_RLE = b"\x81\x83"
 
 
 def encode_full(frame: np.ndarray) -> bytes:
-    """Encode a full row-major RGB565 frame (marker 81 81)."""
-    contiguous = np.ascontiguousarray(frame, dtype=np.uint8)
-    pixels = to_rgb565(contiguous).reshape(-1)
-    return MARKER_FULL + pixels.astype(">u2", copy=False).tobytes()
+    """Encode a full row-major RGB888 frame (marker 81 81)."""
+    pixels = to_rgb888(frame)
+    return MARKER_FULL + pixels.tobytes()
 
 
 def diff_rects(
@@ -46,7 +45,7 @@ def diff_rects(
         ry1 = y0 + int(ys.max()) + 1
         rects.append((rx0, ry0, rx1 - rx0, ry1 - ry0))
 
-    # Merge touching/adjacent bands horizontally compatible or lowest area growth
+    # Merge touching/adjacent bands with lowest added bounding area.
     while len(rects) > max_rects:
         best_pair = (0, 1)
         best_cost = None
@@ -75,34 +74,38 @@ def diff_rects(
 
 
 def encode_delta(cur: np.ndarray, rects: list[tuple[int, int, int, int]]) -> bytes:
-    """Encode delta rectangles (marker 81 82)."""
-    rgb565 = to_rgb565(np.ascontiguousarray(cur, dtype=np.uint8)).astype(">u2", copy=False)
+    """Encode RGB888 delta rectangles (marker 81 82)."""
+    rgb888 = to_rgb888(cur)
     chunks = [MARKER_DELTA, struct.pack(">H", len(rects))]
     for x, y, w, h in rects:
         chunks.append(struct.pack(">HHHH", x, y, w, h))
-        chunks.append(np.ascontiguousarray(rgb565[y : y + h, x : x + w]).tobytes())
+        chunks.append(np.ascontiguousarray(rgb888[y : y + h, x : x + w]).tobytes())
     return b"".join(chunks)
 
 
 def encode_rle(cur: np.ndarray) -> bytes:
-    """Encode a full frame using run-length encoding (marker 81 83)."""
-    pixels = to_rgb565(np.ascontiguousarray(cur, dtype=np.uint8)).reshape(-1)
-    if pixels.size == 0:
+    """Encode a full RGB888 frame using 4-byte RLE runs: (u8 run_minus_1, u8 r, u8 g, u8 b)."""
+    rgb = to_rgb888(cur).reshape(-1, 3)
+    if rgb.shape[0] == 0:
         return MARKER_RLE
-    changes = np.nonzero(pixels[1:] != pixels[:-1])[0] + 1
+    packed = (
+        (rgb[:, 0].astype(np.uint32) << 16)
+        | (rgb[:, 1].astype(np.uint32) << 8)
+        | rgb[:, 2].astype(np.uint32)
+    )
+    changes = np.nonzero(packed[1:] != packed[:-1])[0] + 1
     starts = np.concatenate(([0], changes))
-    ends = np.concatenate((changes, [pixels.size]))
+    ends = np.concatenate((changes, [packed.size]))
     out = bytearray(MARKER_RLE)
     for start, end in zip(starts.tolist(), ends.tolist(), strict=True):
-        val = int(pixels[start])
-        hi = (val >> 8) & 0xFF
-        lo = val & 0xFF
+        r, g, b = int(rgb[start, 0]), int(rgb[start, 1]), int(rgb[start, 2])
         remaining = end - start
         while remaining > 0:
             run = min(256, remaining)
             out.append(run - 1)
-            out.append(hi)
-            out.append(lo)
+            out.append(r)
+            out.append(g)
+            out.append(b)
             remaining -= run
     return bytes(out)
 
@@ -112,7 +115,7 @@ def choose_encoding(
     cur: np.ndarray,
     caps: set[str] | list[str] | tuple[str, ...],
 ) -> tuple[str, bytes | None]:
-    """Choose best frame encoding ('skip', 'full', 'delta', or 'rle') and payload."""
+    """Choose best RGB888 frame encoding ('skip', 'full', 'delta', or 'rle') and payload."""
     if prev_ref is not None and prev_ref.shape == cur.shape and np.array_equal(prev_ref, cur):
         return "skip", None
 

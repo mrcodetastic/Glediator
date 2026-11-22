@@ -21,8 +21,8 @@ def test_row_major_websocket_encoding_order():
     frame[0, 2] = (0, 255, 0)
     frame[1, 1] = (0, 0, 255)
     encoded = MrCodetasticWebSocketOutput.encode_frame(frame)
-    pixels = np.frombuffer(encoded[2:], dtype=">u2").tolist()
-    assert pixels == [0xF800, 0x0000, 0x07E0, 0x0000, 0x001F, 0x0000]
+    pixels = np.frombuffer(encoded[2:], dtype=np.uint8).reshape(6, 3).tolist()
+    assert pixels == [[255, 0, 0], [0, 0, 0], [0, 255, 0], [0, 0, 0], [0, 0, 255], [0, 0, 0]]
 
 
 def test_v1_config_migrates_and_strips_mapping(tmp_path: Path):

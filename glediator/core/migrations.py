@@ -45,7 +45,7 @@ def _migrate_v2_to_v3(data: dict) -> dict:
                     "auto_connect": False,
                 }
             ]
-    updated.setdefault("master", {"brightness": 1.0, "gamma": 1.0})
+    updated.setdefault("master", {"brightness": 1.0, "gamma": 1.4})
     updated.setdefault("playlists", [])
     updated.setdefault("controls", {"keyboard": {}, "osc": {"enabled": False, "port": 9000}})
     updated.setdefault("palettes", {})

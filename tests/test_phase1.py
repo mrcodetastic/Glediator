@@ -10,7 +10,7 @@ import numpy as np
 from websockets.sync.server import serve
 
 from glediator.core.config import EngineConfig
-from glediator.core.frame import to_rgb565
+from glediator.core.frame import to_rgb888
 from glediator.network.discovery import DeviceDiscovery
 from glediator.output.delta import (
     MARKER_DELTA,
@@ -25,16 +25,16 @@ from glediator.output.hub import OutputHub
 from glediator.output.websocket_output import WebSocketOutput
 
 
-def _decode_delta_into(buf_rgb565: np.ndarray, payload: bytes) -> np.ndarray:
+def _decode_delta_into(buf_rgb888: np.ndarray, payload: bytes) -> np.ndarray:
     assert payload[:2] == MARKER_DELTA
     (n_rects,) = struct.unpack(">H", payload[2:4])
     pos = 4
-    out = buf_rgb565.copy()
+    out = buf_rgb888.copy()
     for _ in range(n_rects):
         x, y, w, h = struct.unpack(">HHHH", payload[pos : pos + 8])
         pos += 8
-        nbytes = w * h * 2
-        patch = np.frombuffer(payload[pos : pos + nbytes], dtype=">u2").reshape(h, w)
+        nbytes = w * h * 3
+        patch = np.frombuffer(payload[pos : pos + nbytes], dtype=np.uint8).reshape(h, w, 3)
         out[y : y + h, x : x + w] = patch
         pos += nbytes
     assert pos == len(payload)
@@ -43,28 +43,28 @@ def _decode_delta_into(buf_rgb565: np.ndarray, payload: bytes) -> np.ndarray:
 
 def _decode_rle(payload: bytes, width: int, height: int) -> np.ndarray:
     assert payload[:2] == MARKER_RLE
-    pixels: list[int] = []
+    pixels: list[tuple[int, int, int]] = []
     pos = 2
     while pos < len(payload):
         run = payload[pos] + 1
-        (color,) = struct.unpack(">H", payload[pos + 1 : pos + 3])
-        pixels.extend([color] * run)
-        pos += 3
+        r, g, b = payload[pos + 1], payload[pos + 2], payload[pos + 3]
+        pixels.extend([(r, g, b)] * run)
+        pos += 4
     assert len(pixels) == width * height
-    return np.array(pixels, dtype=np.uint16).reshape(height, width)
+    return np.array(pixels, dtype=np.uint8).reshape(height, width, 3)
 
 
 def test_delta_encode_decode_round_trip():
     rng = np.random.default_rng(42)
     prev = np.zeros((32, 64, 3), dtype=np.uint8)
     cur = prev.copy()
-    cur[5, 10] = (255, 0, 0)
-    cur[20:24, 30:40] = (0, 255, 128)
+    cur[5, 10] = (255, 17, 9)
+    cur[20:24, 30:40] = (3, 255, 128)
     rects = diff_rects(prev, cur)
     assert len(rects) >= 1
     payload = encode_delta(cur, rects)
-    decoded = _decode_delta_into(to_rgb565(prev), payload)
-    assert np.array_equal(decoded, to_rgb565(cur))
+    decoded = _decode_delta_into(to_rgb888(prev), payload)
+    assert np.array_equal(decoded, to_rgb888(cur))
 
     # Full random noise falls back to full frame in choose_encoding
     full_noise = rng.integers(0, 256, (32, 64, 3), dtype=np.uint8)
@@ -80,11 +80,11 @@ def test_delta_encode_decode_round_trip():
 
 def test_rle_encode_decode_round_trip():
     frame = np.zeros((16, 32, 3), dtype=np.uint8)
-    frame[:4, :] = (255, 0, 0)
-    frame[4:10, 8:20] = (0, 255, 0)
+    frame[:4, :] = (255, 3, 7)
+    frame[4:10, 8:20] = (1, 255, 42)
     payload = encode_rle(frame)
     decoded = _decode_rle(payload, 32, 16)
-    assert np.array_equal(decoded, to_rgb565(frame))
+    assert np.array_equal(decoded, to_rgb888(frame))
     kind, data = choose_encoding(None, frame, {"rle"})
     assert kind == "rle"
     assert data is not None and len(data) < len(frame.tobytes())
@@ -109,6 +109,14 @@ def test_output_hub_master_lut_and_multi_device():
     assert len(c1.frames) == 1 and len(c2.frames) == 1
     assert np.all(c1.frames[0] == 100)
     assert np.array_equal(c1.frames[0], c2.frames[0])
+
+    # Gamma > 1.0 deepens dim/mid values while keeping black 0 and white 255.
+    ramp = np.array([[[0, 0, 0], [64, 64, 64], [255, 255, 255]]], dtype=np.uint8)
+    hub.set_processing(brightness=1.0, gamma=1.4)
+    out_ramp = hub.process_frame(ramp)
+    assert out_ramp[0, 0].tolist() == [0, 0, 0]
+    assert 30 < int(out_ramp[0, 1, 0]) < 45
+    assert out_ramp[0, 2].tolist() == [255, 255, 255]
 
     hub.set_processing(brightness=0.0, gamma=1.0)
     hub.submit(frame)
@@ -254,7 +262,7 @@ def test_v1_to_v3_config_migration(tmp_path: Path):
     assert cfg.config_version == 3
     assert cfg.devices[0]["host"] == "192.168.1.77"
     assert cfg.devices[0]["port"] == 12345
-    assert cfg.master == {"brightness": 1.0, "gamma": 1.0}
+    assert cfg.master == {"brightness": 1.0, "gamma": 1.4}
     assert "mapping" not in cfg.presets[0]
 
     # Untouched 127.0.0.1:12345 default does not populate devices

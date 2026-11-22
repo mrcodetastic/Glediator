@@ -1,10 +1,10 @@
 /*
- * MrCodeTastic HUB75 receiver (v1 & v2 WebSocket protocol).
+ * MrCodeTastic HUB75 receiver (RGB888 WebSocket protocol).
  *
- * Wire protocol: row-major RGB565 pixels (0,0)..(W-1,H-1), big-endian:
- *   0x81 0x81 | W*H RGB565 pixels (full frame, v1 & v2)
- *   0x81 0x82 | u16 n_rects, [u16 x, u16 y, u16 w, u16 h, w*h RGB565 pixels]... (delta, v2)
- *   0x81 0x83 | (u8 run_minus_1, u16 rgb565)... (RLE, v2)
+ * Wire protocol: row-major RGB888 pixels (0,0)..(W-1,H-1), 3 bytes per pixel (R, G, B):
+ *   0x81 0x81 | W*H*3 RGB888 bytes (full frame, v1 & v2)
+ *   0x81 0x82 | u16 n_rects, [u16 x, u16 y, u16 w, u16 h, w*h*3 RGB888 bytes]... (delta, v2)
+ *   0x81 0x83 | (u8 run_minus_1, u8 r, u8 g, u8 b)... (RLE, v2)
  * Text JSON: hello, ack, brightness.
  * Discovery: UDP broadcast "CODETASTIC {...}" on port 20586.
  */
@@ -25,7 +25,7 @@
 #define MATRIX_HEIGHT PANEL_HEIGHT
 
 #ifndef WEBSOCKETS_MAX_DATA_SIZE
-#define WEBSOCKETS_MAX_DATA_SIZE (MATRIX_WIDTH * MATRIX_HEIGHT * 2 + 16)
+#define WEBSOCKETS_MAX_DATA_SIZE (MATRIX_WIDTH * MATRIX_HEIGHT * 3 + 16)
 #endif
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
@@ -38,15 +38,16 @@ constexpr uint8_t TYPE_DELTA = 0x82;
 constexpr uint8_t TYPE_RLE = 0x83;
 
 constexpr size_t FRAME_PIXELS = MATRIX_WIDTH * MATRIX_HEIGHT;
-constexpr size_t FULL_MESSAGE_BYTES = FRAME_PIXELS * sizeof(uint16_t) + 2;
+constexpr size_t FRAME_BYTES = FRAME_PIXELS * 3;
+constexpr size_t FULL_MESSAGE_BYTES = FRAME_BYTES + 2;
 
 MatrixPanel_I2S_DMA *display = nullptr;
 WebSocketsServer webSocket(WEBSOCKET_PORT);
 WiFiUDP discoveryUdp;
 
-std::array<uint16_t, FRAME_PIXELS> workingFrame{};
-std::array<uint16_t, FRAME_PIXELS> stagingFrames[2]{};
-std::array<uint16_t, FRAME_PIXELS> drawBuffer{};
+std::array<uint8_t, FRAME_BYTES> workingFrame{};
+std::array<uint8_t, FRAME_BYTES> stagingFrames[2]{};
+std::array<uint8_t, FRAME_BYTES> drawBuffer{};
 volatile uint8_t readyBufferIdx = 0;
 volatile bool framePending = false;
 volatile int16_t lastFrameClient = -1;
@@ -91,14 +92,13 @@ static bool handleDeltaFrame(const uint8_t *payload, size_t length) {
     const uint16_t rh = readU16BE(payload + pos + 6);
     pos += 8;
     if (rx + rw > MATRIX_WIDTH || ry + rh > MATRIX_HEIGHT) return false;
-    const size_t rectBytes = static_cast<size_t>(rw) * static_cast<size_t>(rh) * 2;
+    const size_t rectBytes = static_cast<size_t>(rw) * static_cast<size_t>(rh) * 3;
     if (pos + rectBytes > length) return false;
     for (uint16_t row = 0; row < rh; ++row) {
-      const size_t dstRow = static_cast<size_t>(ry + row) * MATRIX_WIDTH + rx;
-      for (uint16_t col = 0; col < rw; ++col) {
-        workingFrame[dstRow + col] = readU16BE(payload + pos);
-        pos += 2;
-      }
+      const size_t dstRowBytes = (static_cast<size_t>(ry + row) * MATRIX_WIDTH + rx) * 3;
+      const size_t rowBytes = static_cast<size_t>(rw) * 3;
+      std::memcpy(&workingFrame[dstRowBytes], payload + pos, rowBytes);
+      pos += rowBytes;
     }
   }
   return pos == length;
@@ -106,17 +106,23 @@ static bool handleDeltaFrame(const uint8_t *payload, size_t length) {
 
 static bool handleRleFrame(const uint8_t *payload, size_t length) {
   size_t pos = 2;
-  size_t outIdx = 0;
-  while (pos + 3 <= length && outIdx < FRAME_PIXELS) {
+  size_t outPixel = 0;
+  while (pos + 4 <= length && outPixel < FRAME_PIXELS) {
     const size_t run = static_cast<size_t>(payload[pos]) + 1;
-    const uint16_t color = readU16BE(payload + pos + 1);
-    pos += 3;
-    if (outIdx + run > FRAME_PIXELS) return false;
+    const uint8_t r = payload[pos + 1];
+    const uint8_t g = payload[pos + 2];
+    const uint8_t b = payload[pos + 3];
+    pos += 4;
+    if (outPixel + run > FRAME_PIXELS) return false;
     for (size_t k = 0; k < run; ++k) {
-      workingFrame[outIdx++] = color;
+      const size_t byteIdx = outPixel * 3;
+      workingFrame[byteIdx] = r;
+      workingFrame[byteIdx + 1] = g;
+      workingFrame[byteIdx + 2] = b;
+      ++outPixel;
     }
   }
-  return pos == length && outIdx == FRAME_PIXELS;
+  return pos == length && outPixel == FRAME_PIXELS;
 }
 
 static void handleTextCommand(const uint8_t *payload, size_t length) {
@@ -143,11 +149,11 @@ static void reportWebSocketEvent(uint8_t clientId, WStype_t type, uint8_t *paylo
     case WStype_CONNECTED: {
       IPAddress ip = webSocket.remoteIP(clientId);
       Serial.printf("WebSocket client connected: %s\n", ip.toString().c_str());
-      char hello[200];
+      char hello[220];
       std::snprintf(
           hello, sizeof(hello),
           "{\"type\":\"hello\",\"v\":2,\"name\":\"%s\",\"w\":%u,\"h\":%u,"
-          "\"caps\":[\"delta\",\"ack\",\"rle\",\"brightness\"]}",
+          "\"caps\":[\"rgb888\",\"delta\",\"ack\",\"rle\",\"brightness\"]}",
           MDNS_HOST, static_cast<unsigned>(MATRIX_WIDTH), static_cast<unsigned>(MATRIX_HEIGHT));
       webSocket.sendTXT(clientId, hello);
       break;
@@ -165,9 +171,7 @@ static void reportWebSocketEvent(uint8_t clientId, WStype_t type, uint8_t *paylo
       }
       bool ok = false;
       if (payload[1] == TYPE_FULL && length == FULL_MESSAGE_BYTES) {
-        for (size_t i = 0; i < FRAME_PIXELS; ++i) {
-          workingFrame[i] = readU16BE(payload + 2 + i * 2);
-        }
+        std::memcpy(workingFrame.data(), payload + 2, FRAME_BYTES);
         ok = true;
       } else if (payload[1] == TYPE_DELTA) {
         ok = handleDeltaFrame(payload, length);
@@ -205,7 +209,8 @@ static void displayPendingFrame() {
   for (size_t i = 0; i < FRAME_PIXELS; ++i) {
     const int16_t x = static_cast<int16_t>(i % MATRIX_WIDTH);
     const int16_t y = static_cast<int16_t>(i / MATRIX_WIDTH);
-    display->drawPixel(x, y, drawBuffer[i]);
+    const size_t idx = i * 3;
+    display->drawPixelRGB888(x, y, drawBuffer[idx], drawBuffer[idx + 1], drawBuffer[idx + 2]);
   }
 
   uint32_t refreshHz = display->calculated_refresh_rate;
@@ -301,6 +306,8 @@ static void startNetworkServices() {
 static void startDisplay() {
   HUB75_I2S_CFG config(PANEL_WIDTH, PANEL_HEIGHT, PANEL_CHAIN);
   config.double_buff = true;
+  // Higher shift clock preserves full 8-bit BCM greyscale resolution above 60 Hz.
+  config.i2sspeed = HUB75_I2S_CFG::HZ_16M;
 
   display = new MatrixPanel_I2S_DMA(config);
   if (!display->begin()) {
@@ -308,7 +315,7 @@ static void startDisplay() {
     while (true) delay(1000);
   }
   display->clearScreen();
-  Serial.printf("HUB75 ready: %ux%u, refresh %u Hz, double buffering on\n",
+  Serial.printf("HUB75 ready: %ux%u, refresh %u Hz, double buffering on (RGB888)\n",
                 MATRIX_WIDTH, MATRIX_HEIGHT, display->calculated_refresh_rate);
 }
 

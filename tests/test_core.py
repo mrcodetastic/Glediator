@@ -6,7 +6,7 @@ from glediator.audio.capture import AudioCapture
 from glediator.core.config import EngineConfig
 from glediator.core.engine import RenderEngine
 from glediator.core.fader import crossfade
-from glediator.core.frame import to_rgb565
+from glediator.core.frame import to_rgb888
 from glediator.core.pipeline import mix
 from glediator.core.scene import Scene
 from glediator.effects import create_effect
@@ -30,8 +30,9 @@ def test_fader_endpoints():
     assert np.all(crossfade(a, b, 1) == b)
 
 
-def test_rgb565_and_mix():
-    assert int(to_rgb565(np.array([[[255, 0, 0]]], dtype=np.uint8))[0, 0]) == 0xF800
+def test_rgb888_and_mix():
+    px = np.array([[[255, 12, 34]]], dtype=np.uint8)
+    assert np.array_equal(to_rgb888(px), px)
     result = mix(np.array([[[200, 80, 10]]], dtype=np.uint8), np.array([[[100, 80, 20]]], dtype=np.uint8))
     assert result.tolist() == [[[255, 160, 30]]]
 
@@ -46,13 +47,13 @@ def test_generators_and_scene_shapes():
         assert frame.dtype == np.uint8
 
 
-def test_mrcodetastic_websocket_frame_marker_and_rgb565_payload():
+def test_mrcodetastic_websocket_frame_marker_and_rgb888_payload():
     frame = np.zeros((32, 64, 3), dtype=np.uint8)
-    frame[0, 0] = (255, 0, 0)
+    frame[0, 0] = (255, 128, 17)
     data = MrCodetasticWebSocketOutput.encode_frame(frame)
     assert data[:2] == bytes((0b10000001, 0b10000001))
-    assert data[2:4] == bytes((0xF8, 0x00))
-    assert len(data) == 2 + (64 * 32 * 2)
+    assert data[2:5] == bytes((255, 128, 17))
+    assert len(data) == 2 + (64 * 32 * 3)
 
 
 def test_scene_state_and_generator_parameters_round_trip():
@@ -216,6 +217,20 @@ def test_effect_catalog_updates_and_visual_behavior():
     scene = Scene("legacy", 16, 8)
     scene.restore({"layers": [{"generator": "Maze"}, {"generator": "Falling Objects"}, {"generator": "FireKoz"}]})
     assert [scene.layers[i].generator_name for i in range(3)] == ["3D Maze", "Falling Snow", "Fire"]
+
+    # Dark-based palettes anchor at true (0, 0, 0) black to avoid glowing background LEDs
+    for pal_name in ("Aurora", "Fire", "Ocean", "Sunset", "Neon", "Candy", "Monochrome"):
+        assert PALETTES[pal_name][0] == (0, 0, 0)
+
+    # Falling Snow keeps faint distant flakes genuinely dim while foreground flakes peak near white
+    snow = create_effect("Falling Snow")
+    snow._rng = np.random.default_rng(12)
+    snow_frame = snow.drawFrame(64, 32, 0.5)
+    nz = snow_frame.max(axis=2)
+    nz_vals = nz[nz > 0]
+    assert np.any(nz == 0)
+    assert float(np.percentile(nz_vals, 25)) < 40.0
+    assert int(nz_vals.max()) > 180
 
 
 def test_settings_persist_endpoint_and_live_scene(tmp_path: Path):

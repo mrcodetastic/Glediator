@@ -91,7 +91,7 @@ class NetworkPanel(QGroupBox):
         self.gamma_spin.setRange(0.5, 3.0)
         self.gamma_spin.setSingleStep(0.1)
         self.gamma_spin.setDecimals(2)
-        self.gamma_spin.setValue(float(self.config.master.get("gamma", 1.0)))
+        self.gamma_spin.setValue(float(self.config.master.get("gamma", 1.4)))
         self.gamma_spin.valueChanged.connect(self._on_master_processing_changed)
         proc_row.addWidget(self.gamma_spin)
         proc_row.addStretch(1)

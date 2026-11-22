@@ -77,7 +77,7 @@ class StarfieldEffect(ConfiguredEffect):
         psx = cx + (self._x / prev_z) * scale_x
         psy = cy + (self._y / prev_z) * scale_y
 
-        brightness = np.clip((1.0 - self._z) ** 1.35 * 1.15, 0.14, 1.0)
+        brightness = np.clip((1.0 - self._z) ** 2.1 * 1.15, 0.06, 1.0)
         canvas = np.zeros((height, width), dtype=np.float32)
 
         # Draw crisp star points and short radial warp trails for foreground stars.

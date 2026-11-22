@@ -7,8 +7,6 @@ def new_frame(width: int, height: int) -> np.ndarray:
     return np.zeros((height, width, 3), dtype=np.uint8)
 
 
-def to_rgb565(frame: np.ndarray) -> np.ndarray:
-    rgb = np.asarray(frame, dtype=np.uint8)
-    return (((rgb[..., 0].astype(np.uint16) >> 3) << 11)
-            | ((rgb[..., 1].astype(np.uint16) >> 2) << 5)
-            | (rgb[..., 2].astype(np.uint16) >> 3))
+def to_rgb888(frame: np.ndarray) -> np.ndarray:
+    """Return a contiguous row-major RGB888 uint8 pixel array of shape (H, W, 3)."""
+    return np.ascontiguousarray(frame, dtype=np.uint8)

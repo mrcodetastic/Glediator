@@ -25,7 +25,7 @@ class FallingSnowEffect(ConfiguredEffect):
         self._flakes = np.column_stack((
             self._rng.random(pool),                     # base x [0, 1)
             self._rng.random(pool),                     # base y [0, 1)
-            self._rng.uniform(0.35, 1.0, pool),         # depth / speed / brightness
+            self._rng.uniform(0.15, 1.0, pool),         # depth / speed / brightness
             self._rng.uniform(0.8, 2.6, pool),          # horizontal sway frequency
             self._rng.uniform(0.0, np.pi * 2.0, pool),  # sway phase
         )).astype(np.float32)
@@ -46,9 +46,9 @@ class FallingSnowEffect(ConfiguredEffect):
         flakes = self._flakes[:active_count]
         depth = flakes[:, 2]
 
-        # Foreground flakes fall faster and glow brighter than distant ones.
-        py = np.mod(flakes[:, 1] * height + time_seconds * speed * (0.35 + 0.85 * depth), height)
-        sway = np.sin(time_seconds * flakes[:, 3] + flakes[:, 4]) * (0.45 + 0.8 * depth)
+        # Foreground flakes fall faster and glow brightly; distant flakes stay subtle and dim.
+        py = np.mod(flakes[:, 1] * height + time_seconds * speed * (0.28 + 0.92 * depth), height)
+        sway = np.sin(time_seconds * flakes[:, 3] + flakes[:, 4]) * (0.35 + 0.85 * depth)
         px = np.mod(flakes[:, 0] * width + time_seconds * wind * 4.5 * depth + sway, width)
 
         ix = np.floor(px).astype(int) % width
@@ -58,7 +58,7 @@ class FallingSnowEffect(ConfiguredEffect):
 
         intensity = np.zeros((height, width), dtype=np.float32)
         color_scalar = np.zeros((height, width), dtype=np.float32)
-        brightness = 0.35 + 0.65 * depth
+        brightness = 0.08 + 0.92 * np.power(depth, 2.2)
 
         # Bilinear splat gives soft smooth falling snowflakes on coarse LED panels.
         for dx, wx in ((0, 1.0 - fx), (1, fx)):

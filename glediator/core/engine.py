@@ -79,7 +79,7 @@ class RenderEngine:
         self.outputs = OutputHub()
         self.outputs.set_processing(
             config.master.get("brightness", 1.0),
-            config.master.get("gamma", 1.0),
+            config.master.get("gamma", 1.4),
         )
         from glediator.generators.palettes import set_custom_palettes
 
