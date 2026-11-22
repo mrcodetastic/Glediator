@@ -33,7 +33,12 @@ class FilePickerWidget(QWidget):
         layout.addWidget(self.browse_btn)
 
     def _browse(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Choose media file", self.line_edit.text())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose media file",
+            self.line_edit.text(),
+            "Media Files (*.mp4 *.mov *.mkv *.avi *.webm *.gif *.png *.jpg *.jpeg *.bmp);;All Files (*)",
+        )
         if path:
             self.line_edit.setText(path)
 

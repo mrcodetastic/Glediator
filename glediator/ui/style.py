@@ -65,9 +65,12 @@ def build_stylesheet(theme: str = "dark") -> str:
             background:{p['menu_bg']}; color:{p['menu_fg']};
             border-bottom:1px solid {p['menu_border']}; padding:3px 8px;
         }}
-        QMenuBar::item {{ background:transparent; color:{p['menu_fg']}; padding:5px 10px; border-radius:3px; }}
+        QMenuBar::item {{ background:transparent; color:{p['menu_fg']}; padding:5px 13px; border-radius:3px; }}
         QMenuBar::item:selected {{ background:{p['menu_sel']}; color:#102438; }}
-        QMenu {{ background:{p['menu_popup_bg']}; color:{p['menu_fg']}; border:1px solid {p['menu_border']}; }}
+        QMenu {{
+            background:{p['menu_popup_bg']}; color:{p['menu_fg']};
+            border:1px solid {p['menu_border']}; min-width:225px;
+        }}
         QMenu::item:selected {{ background:{p['menu_popup_sel']}; color:#102438; }}
         QLabel#appTitle {{ font-size:22pt; font-weight:700; letter-spacing:2px; color:{p['title']}; }}
         QLabel#subtitle {{ color:{p['muted']}; font-size:8pt; letter-spacing:2px; padding-left:10px; padding-top:6px; }}
@@ -84,7 +87,11 @@ def build_stylesheet(theme: str = "dark") -> str:
         QListWidget {{ background:{p['list_bg']}; border:1px solid {p['border']}; border-radius:5px; padding:3px; }}
         QListWidget::item {{ padding:5px 6px; border-radius:3px; }}
         QListWidget::item:selected {{ background:{p['selected']}; color:{p['title']}; }}
-        QComboBox, QSpinBox, QDoubleSpinBox {{
+        QComboBox {{
+            background:{p['input_bg']}; border:1px solid {p['input_border']};
+            border-radius:5px; padding:5px 8px;
+        }}
+        QSpinBox, QDoubleSpinBox {{
             background:{p['input_bg']}; border:1px solid {p['input_border']};
             border-radius:5px; padding:5px; min-width:68px;
         }}

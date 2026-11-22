@@ -39,9 +39,15 @@ def test_inspector_undo_preview_and_docks(qtbot, monkeypatch):
     window.performance_dock.show()
     window.performance_panel.update_status(engine.status(), 60)
 
-    # Playlist panel new & add preset
+    # Playlist panel shows guidance when no scenes exist, then enables once saved
+    assert window.playlist_panel.preset_combo.currentText() == window.playlist_panel.NO_SCENES_MSG
+    assert not window.playlist_panel.new_btn.isEnabled()
+    assert window.preset_bar.preset_combo.minimumWidth() >= 275
+
     window._save_preset("PresetOne")
     window.playlist_panel.refresh_presets()
+    window.playlist_panel.refresh_playlists()
+    assert window.playlist_panel.new_btn.isEnabled()
     window.config.playlists.append({"name": "SetA", "entries": [], "loop": True, "shuffle": False})
     window.playlist_panel.refresh_playlists()
     window.playlist_panel._add_entry()

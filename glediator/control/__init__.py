@@ -1,1 +1,1 @@
-"""External control adapters (actions, keyboard, MIDI, OSC)."""
+"""External control adapters (actions, keyboard, OSC)."""

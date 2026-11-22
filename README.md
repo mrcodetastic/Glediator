@@ -15,13 +15,13 @@ python -m pip install -e .
 python main.py
 ```
 
-Optional extras: `glediator3[midi]`, `glediator3[osc]`, `glediator3[video]`, `glediator3[camera]`.
+Optional extras: `glediator3[osc]`, `glediator3[camera]`.
 
 ## Key Features
 
 - **Dual-Deck 5-Layer Mixing:** Source A and Source B with 11 blend modes, per-layer opacity/brightness, 12 parameterised filters (up to 3 chained), live docked Layer Inspector, and undo/redo (`Ctrl+Z` / `Ctrl+Y`).
-- **47 Built-in Effects + Plugins:** 28 Aurora patterns, generative effects, Wave, Scrolling Text (cross-platform fonts & palettes), Screen Capture, Image/GIF player, optional Video/Webcam, and user plugins from `~/.glediator/effects/`.
-- **Live Show Control:** Transition modes (`crossfade`, `cut`, `wipe_*`, `dissolve`, `luma`), blackout/freeze/speed master bus, bass/mid/treble & beat/BPM extraction, tap tempo, audio/LFO parameter modulation, timed/beat playlists, keyboard shortcuts, and optional MIDI/OSC.
+- **47 Built-in Effects + Plugins:** 28 Aurora patterns, generative effects, Wave, Scrolling Text (cross-platform fonts & palettes), Screen Capture, Image/GIF player, Video Player (aspect-preserving fill crop), optional Webcam, and user plugins from `~/.glediator/effects/`.
+- **Live Show Control:** Transition modes (`crossfade`, `cut`, `wipe_*`, `dissolve`, `luma`), blackout/freeze/speed master bus, bass/mid/treble & beat/BPM extraction, tap tempo, audio/LFO parameter modulation, timed/beat playlists, keyboard shortcuts, and optional OSC.
 - **Row-Major WebSocket v1/v2 Link:** Sends plain row-major RGB565 pixels (`(0,0)` to `(W-1,H-1)`) over WebSocket port `12345` with UDP `CODETASTIC` discovery (`20586`), size-mismatch protection, ack flow control, and delta/RLE compression. Physical panel wiring is handled by the ESP32 firmware.
 
 ## Documentation

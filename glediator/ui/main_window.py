@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
 )
 
 from glediator.control.actions import DEFAULT_SHORTCUTS, ActionRegistry, register_engine_actions
-from glediator.control.midi import MidiController
 from glediator.control.osc import OscController
 from glediator.core.config import EngineConfig
 from glediator.core.engine import RenderEngine
@@ -63,7 +62,6 @@ class MainWindow(QMainWindow):
 
         self.undo_stack = QUndoStack(self)
         self.action_registry = ActionRegistry()
-        self.midi_controller = MidiController(self.action_registry)
         self.osc_controller = OscController(self.action_registry)
         self._shortcuts: list[QShortcut] = []
 
@@ -115,7 +113,6 @@ class MainWindow(QMainWindow):
             load_preset_cb=self._load_preset,
             toggle_playlist_cb=self.playlist_panel.toggle_play,
         )
-        self.midi_controller.set_mappings(self.config.controls.get("midi", []))
         osc_cfg = self.config.controls.get("osc", {})
         if osc_cfg.get("enabled"):
             self.osc_controller.start(port=int(osc_cfg.get("port", 9000)))
@@ -184,8 +181,8 @@ class MainWindow(QMainWindow):
             theme_menu.addAction(t_act)
 
         control_menu = self.menuBar().addMenu("&Control")
-        midi_osc_action = control_menu.addAction("MIDI & OSC Settings…")
-        midi_osc_action.triggered.connect(self._show_controls_dialog)
+        osc_action = control_menu.addAction("OSC Settings…")
+        osc_action.triggered.connect(self._show_controls_dialog)
 
         help_menu = self.menuBar().addMenu("&Help")
         effects_dir_act = help_menu.addAction("Open Effects Folder")
@@ -226,7 +223,7 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _show_controls_dialog(self) -> None:
-        dlg = ControlsDialog(self, self.config, self.action_registry, self.midi_controller, self.osc_controller)
+        dlg = ControlsDialog(self, self.config, self.osc_controller)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._save_settings()
 
@@ -654,7 +651,6 @@ class MainWindow(QMainWindow):
         self._qsettings.setValue("geometry", self.saveGeometry())
         self._qsettings.setValue("windowState", self.saveState())
         self.discovery.stop()
-        self.midi_controller.stop()
         self.osc_controller.stop()
         self.network_panel.disconnect_output()
         self.network_panel.sync_endpoint_to_config()

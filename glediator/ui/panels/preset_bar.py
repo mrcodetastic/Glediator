@@ -18,7 +18,7 @@ class PresetBar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(QLabel("LOAD / SAVE SCENE"))
         self.preset_combo = QComboBox()
-        self.preset_combo.setMinimumWidth(220)
+        self.preset_combo.setMinimumWidth(275)
         layout.addWidget(self.preset_combo)
 
         save_btn = QPushButton("Save as preset…")

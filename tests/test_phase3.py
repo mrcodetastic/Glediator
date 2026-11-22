@@ -186,3 +186,52 @@ def test_project_files_preset_merge_and_lock(tmp_path: Path):
     assert acquire_session_lock(lock) is True
     release_session_lock(lock)
     assert not lock.exists()
+
+
+def test_video_player_fill_crop_and_playback(tmp_path: Path):
+    import time
+
+    import av
+
+    from glediator.effects.video_player import apply_video_fit, compute_video_resize
+
+    # 16:9 source (160x90) -> 32x32 square target with Fill (Crop): scales height=32, width=57, crops center 32x32
+    sw, sh = compute_video_resize(160, 90, 32, 32, "Fill (Crop)")
+    assert sh == 32 and sw > 32
+    wide = np.zeros((sh, sw, 3), dtype=np.uint8)
+    wide[:, :10] = (255, 0, 0)
+    wide[:, sw // 2 - 4 : sw // 2 + 4] = (0, 255, 0)
+    cropped = apply_video_fit(wide, 32, 32, "Fill (Crop)")
+    assert cropped.shape == (32, 32, 3)
+    assert np.count_nonzero(cropped[..., 1]) > 0
+    assert np.count_nonzero(cropped[..., 0]) == 0
+
+    # Real video encode + decode via PyAV
+    vid_path = tmp_path / "sample.mp4"
+    with av.open(str(vid_path), mode="w") as container:
+        stream = container.add_stream("mpeg4", rate=24)
+        stream.width = 96
+        stream.height = 48
+        stream.pix_fmt = "yuv420p"
+        for _ in range(4):
+            arr = np.full((48, 96, 3), 200, dtype=np.uint8)
+            frame = av.VideoFrame.from_ndarray(arr, format="rgb24")
+            for pkt in stream.encode(frame):
+                container.mux(pkt)
+        for pkt in stream.encode():
+            container.mux(pkt)
+
+    fx = create_effect("Video Player")
+    try:
+        fx.configure({"path": str(vid_path), "fit": "Fill (Crop)", "speed": 1.0, "loop": True})
+        deadline = time.monotonic() + 2.0
+        out = np.zeros((32, 32, 3), dtype=np.uint8)
+        while time.monotonic() < deadline:
+            out = fx.drawFrame(32, 32, 0.0)
+            if np.count_nonzero(out) > 0:
+                break
+            time.sleep(0.03)
+        assert out.shape == (32, 32, 3)
+        assert np.mean(out) > 150
+    finally:
+        fx.cleanup()

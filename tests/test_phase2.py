@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import random
-import types
 
 import numpy as np
 
 from glediator.audio.features import AudioFeatureExtractor
 from glediator.control.actions import ActionRegistry, register_engine_actions
-from glediator.control.midi import MidiController
 from glediator.control.osc import OscController
 from glediator.core.config import EngineConfig
 from glediator.core.engine import RenderEngine
@@ -164,7 +162,7 @@ def test_playlist_sequencer_timed_shuffle_and_beats():
         prev = seq.index
 
 
-def test_actions_midi_and_osc_dispatch():
+def test_actions_and_osc_dispatch():
     cfg = EngineConfig(width=16, height=8, presets=[{"name": "First", "state": {}}])
     engine = RenderEngine(cfg)
     reg = ActionRegistry()
@@ -177,16 +175,6 @@ def test_actions_midi_and_osc_dispatch():
     assert engine.blackout is True
     assert reg.invoke("preset.load.1")
     assert loaded == ["First"]
-
-    midi = MidiController(reg)
-    learned = []
-    midi.start_learn(learned.append)
-    midi.dispatch_message(types.SimpleNamespace(type="control_change", channel=0, control=7, value=64))
-    assert learned == [{"type": "cc", "channel": 0, "number": 7}]
-
-    midi.set_mappings([{"type": "cc", "channel": 0, "number": 7, "action": "fader.set", "mode": "continuous"}])
-    midi.dispatch_message(types.SimpleNamespace(type="control_change", channel=0, control=7, value=127))
-    assert abs(engine.fader - 1.0) < 1e-6
 
     osc = OscController(reg)
     assert osc.dispatch("/glediator/master/blackout/toggle", 0.0)

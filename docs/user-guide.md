@@ -27,4 +27,4 @@ Glediator uses a dual-deck live mixer layout:
   - **Linux:** Ensure a PipeWire/PulseAudio monitor source is available for loopback.
   - **macOS:** Use a virtual loopback device such as BlackHole if capturing system output.
 - **Keyboard shortcuts:** `Space` (auto transition), `B` (blackout), `F` (freeze), `T` (tap tempo), `1–9` (presets), `←/→` (playlist). See **Help → Keyboard Shortcuts…**.
-- **MIDI & OSC:** Install `glediator3[midi]` and/or `glediator3[osc]` and configure via **Control → MIDI & OSC Settings…**.
+- **OSC:** Install `glediator3[osc]` and configure via **Control → OSC Settings…**.

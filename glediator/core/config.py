@@ -16,7 +16,7 @@ def _default_master() -> dict:
 
 
 def _default_controls() -> dict:
-    return {"keyboard": {}, "midi": [], "osc": {"enabled": False, "port": 9000}}
+    return {"keyboard": {}, "osc": {"enabled": False, "port": 9000}}
 
 
 def _default_ui() -> dict:

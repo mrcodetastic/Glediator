@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from glediator.control.actions import ActionRegistry
-from glediator.control.midi import MidiController
 from glediator.control.osc import OscController
 from glediator.core.config import EngineConfig
 from glediator.effects import effect_categories, effect_descriptions, picker_effect_names
@@ -39,5 +38,5 @@ def test_all_dialogs_construct_and_filter_cleanly(qtbot):
     reg = ActionRegistry()
     shortcuts_dlg = ShortcutsDialog(None, {}, reg)
     qtbot.addWidget(shortcuts_dlg)
-    controls_dlg = ControlsDialog(None, EngineConfig(), reg, MidiController(reg), OscController(reg))
+    controls_dlg = ControlsDialog(None, EngineConfig(), OscController(reg))
     qtbot.addWidget(controls_dlg)
