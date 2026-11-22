@@ -53,6 +53,8 @@ def test_network_panel_ignores_untouched_localhost(qtbot, monkeypatch):
     window = MainWindow(engine, config)
     qtbot.addWidget(window)
 
+    assert not hasattr(window.network_panel, "brightness_slider")
+    assert not window.windowIcon().isNull()
     assert window.network_panel.device_list.count() == 0
     window.network_panel.sync_endpoint_to_config()
     assert config.devices == []

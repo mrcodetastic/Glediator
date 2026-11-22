@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from glediator.core.config import EngineConfig
@@ -15,6 +17,9 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("Glediator")
     app.setOrganizationName("Glediator")
+    icon_path = Path(__file__).resolve().parent / "assets" / "icon.png"
+    if icon_path.is_file():
+        app.setWindowIcon(QIcon(str(icon_path)))
     load_effects()
     dirty_prev = acquire_session_lock()
     config = EngineConfig.load()

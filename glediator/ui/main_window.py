@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
-from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut, QUndoStack
+from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence, QShortcut, QUndoStack
 from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
@@ -40,6 +40,7 @@ from glediator.ui.commands import (
 from glediator.ui.dialogs.controls_dialog import ControlsDialog, ShortcutsDialog
 from glediator.ui.dialogs.palette_editor import PaletteEditorDialog
 from glediator.ui.dialogs.panel_config import PanelConfigDialog
+from glediator.ui.dialogs.user_guide import UserGuideDialog
 from glediator.ui.panels.fader_panel import FaderPanel
 from glediator.ui.panels.inspector import LayerInspector
 from glediator.ui.panels.network_panel import NetworkPanel
@@ -55,6 +56,9 @@ class MainWindow(QMainWindow):
     def __init__(self, engine: RenderEngine, config: EngineConfig) -> None:
         super().__init__()
         self.engine, self.config = engine, config
+        icon_path = Path(__file__).resolve().parents[1] / "assets" / "icon.png"
+        if icon_path.is_file():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self._project_path: Path | None = None
         self._dirty = False
         self._recent_projects: list[str] = []
@@ -185,12 +189,20 @@ class MainWindow(QMainWindow):
         osc_action.triggered.connect(self._show_controls_dialog)
 
         help_menu = self.menuBar().addMenu("&Help")
+        guide_action = help_menu.addAction("User Guide…")
+        guide_action.setShortcut("F1")
+        guide_action.triggered.connect(self._show_user_guide)
+        help_menu.addSeparator()
         effects_dir_act = help_menu.addAction("Open Effects Folder")
         effects_dir_act.triggered.connect(self._open_effects_folder)
         shortcuts_action = help_menu.addAction("Keyboard Shortcuts…")
         shortcuts_action.triggered.connect(self._show_shortcuts)
         about_action = help_menu.addAction("About")
         about_action.triggered.connect(self._show_about)
+
+    def _show_user_guide(self) -> None:
+        dlg = UserGuideDialog(self)
+        dlg.exec()
 
     def _apply_theme(self, theme: str) -> None:
         self.config.ui["theme"] = theme

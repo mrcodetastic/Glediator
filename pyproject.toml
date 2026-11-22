@@ -29,6 +29,7 @@ glediator = "glediator.app:main"
 include = ["glediator*"]
 
 [tool.setuptools.package-data]
+"glediator.assets" = ["*.png", "*.ico", "*.md"]
 "glediator.assets.fonts" = ["*.ttf"]
 
 [tool.setuptools.dynamic]

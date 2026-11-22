@@ -86,12 +86,6 @@ class NetworkPanel(QGroupBox):
         layout.addWidget(self.mismatch_banner)
 
         proc_row = QHBoxLayout()
-        proc_row.addWidget(QLabel("Out brightness"))
-        self.brightness_slider = QSlider(Qt.Orientation.Horizontal)
-        self.brightness_slider.setRange(0, 100)
-        self.brightness_slider.setValue(round(self.config.master.get("brightness", 1.0) * 100))
-        self.brightness_slider.valueChanged.connect(self._on_master_processing_changed)
-        proc_row.addWidget(self.brightness_slider, 1)
         proc_row.addWidget(QLabel("Gamma"))
         self.gamma_spin = QDoubleSpinBox()
         self.gamma_spin.setRange(0.5, 3.0)
@@ -100,6 +94,7 @@ class NetworkPanel(QGroupBox):
         self.gamma_spin.setValue(float(self.config.master.get("gamma", 1.0)))
         self.gamma_spin.valueChanged.connect(self._on_master_processing_changed)
         proc_row.addWidget(self.gamma_spin)
+        proc_row.addStretch(1)
         layout.addLayout(proc_row)
 
         self.device_brightness_row = QWidget()
@@ -197,7 +192,7 @@ class NetworkPanel(QGroupBox):
                 }
         self.config.devices = list(saved_by_key.values())
         self.config.master = {
-            "brightness": self.brightness_slider.value() / 100.0,
+            "brightness": float(self.config.master.get("brightness", 1.0)),
             "gamma": float(self.gamma_spin.value()),
         }
 
@@ -414,9 +409,7 @@ class NetworkPanel(QGroupBox):
             self._disconnect_key(key)
 
     def _on_master_processing_changed(self) -> None:
-        brightness = self.brightness_slider.value() / 100.0
-        gamma = float(self.gamma_spin.value())
-        self.engine.set_master(brightness=brightness, gamma=gamma)
+        self.engine.set_master(gamma=float(self.gamma_spin.value()))
 
     def _on_device_brightness_changed(self, value: int) -> None:
         for output in self._outputs.values():

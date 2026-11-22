@@ -25,6 +25,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="Glediator",
+    icon="glediator/assets/icon.ico",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

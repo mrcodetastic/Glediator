@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from glediator.control.actions import ActionRegistry
 from glediator.control.osc import OscController
 from glediator.core.config import EngineConfig
@@ -9,6 +11,7 @@ from glediator.ui.dialogs.effect_picker import EffectPickerDialog
 from glediator.ui.dialogs.effect_settings import EffectSettingsDialog
 from glediator.ui.dialogs.palette_editor import PaletteEditorDialog
 from glediator.ui.dialogs.panel_config import PanelConfigDialog
+from glediator.ui.dialogs.user_guide import UserGuideDialog
 
 
 def test_all_dialogs_construct_and_filter_cleanly(qtbot):
@@ -40,3 +43,14 @@ def test_all_dialogs_construct_and_filter_cleanly(qtbot):
     qtbot.addWidget(shortcuts_dlg)
     controls_dlg = ControlsDialog(None, EngineConfig(), OscController(reg))
     qtbot.addWidget(controls_dlg)
+
+    guide_dlg = UserGuideDialog(None)
+    qtbot.addWidget(guide_dlg)
+    assert "Glediator User Guide" in guide_dlg.browser.toPlainText()
+
+    root = Path(__file__).resolve().parents[2]
+    assert (root / "glediator" / "assets" / "icon.png").is_file()
+    assert (root / "glediator" / "assets" / "icon.ico").is_file()
+    assert (root / "docs" / "user-guide.md").read_text(encoding="utf-8") == (
+        root / "glediator" / "assets" / "user-guide.md"
+    ).read_text(encoding="utf-8")
