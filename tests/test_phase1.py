@@ -256,3 +256,9 @@ def test_v1_to_v3_config_migration(tmp_path: Path):
     assert cfg.devices[0]["port"] == 12345
     assert cfg.master == {"brightness": 1.0, "gamma": 1.0}
     assert "mapping" not in cfg.presets[0]
+
+    # Untouched 127.0.0.1:12345 default does not populate devices
+    untouched = tmp_path / "untouched.json"
+    untouched.write_text(json.dumps({"websocket_host": "127.0.0.1", "websocket_port": 12345}), encoding="utf-8")
+    cfg_default = EngineConfig.load(untouched)
+    assert cfg_default.devices == []

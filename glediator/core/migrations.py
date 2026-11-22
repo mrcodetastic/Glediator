@@ -26,21 +26,25 @@ def _migrate_v1_to_v2(data: dict) -> dict:
 
 def _migrate_v2_to_v3(data: dict) -> dict:
     updated = deepcopy(data)
-    host = str(updated.pop("websocket_host", "127.0.0.1")).strip() or "127.0.0.1"
+    host = str(updated.pop("websocket_host", "")).strip()
     try:
         port = int(updated.pop("websocket_port", 12345))
     except (TypeError, ValueError):
         port = 12345
     if "devices" not in updated or not isinstance(updated["devices"], list):
-        updated["devices"] = [
-            {
-                "id": "dev-1",
-                "name": "",
-                "host": host,
-                "port": max(1, min(65535, port)),
-                "auto_connect": False,
-            }
-        ]
+        is_untouched_local = host in ("", "127.0.0.1", "localhost") and port == 12345
+        if is_untouched_local:
+            updated["devices"] = []
+        else:
+            updated["devices"] = [
+                {
+                    "id": "dev-1",
+                    "name": "",
+                    "host": host,
+                    "port": max(1, min(65535, port)),
+                    "auto_connect": False,
+                }
+            ]
     updated.setdefault("master", {"brightness": 1.0, "gamma": 1.0})
     updated.setdefault("playlists", [])
     updated.setdefault("controls", {"keyboard": {}, "osc": {"enabled": False, "port": 9000}})

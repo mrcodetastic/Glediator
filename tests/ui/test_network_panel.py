@@ -37,3 +37,24 @@ def test_network_panel_shows_mismatch_banner_and_applies_device_size(qtbot, monk
     assert window.network_panel.mismatch_banner.isHidden()
     window.close()
     engine.stop()
+
+
+def test_network_panel_ignores_untouched_localhost(qtbot, monkeypatch):
+    monkeypatch.setattr("glediator.network.discovery.DeviceDiscovery.start", lambda self: None)
+    monkeypatch.setattr("glediator.network.discovery.DeviceDiscovery.stop", lambda self: None)
+    monkeypatch.setattr(EngineConfig, "save", lambda self, path=None: None)
+
+    config = EngineConfig(
+        width=32,
+        height=16,
+        devices=[{"id": "dev-1", "name": "", "host": "127.0.0.1", "port": 12345, "auto_connect": False}],
+    )
+    engine = RenderEngine(config)
+    window = MainWindow(engine, config)
+    qtbot.addWidget(window)
+
+    assert window.network_panel.device_list.count() == 0
+    window.network_panel.sync_endpoint_to_config()
+    assert config.devices == []
+    window.close()
+    engine.stop()

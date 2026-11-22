@@ -121,8 +121,9 @@ class NetworkPanel(QGroupBox):
         self.manual_form = QWidget()
         manual_row = QHBoxLayout(self.manual_form)
         manual_row.setContentsMargins(0, 0, 0, 0)
-        self.websocket_host = QLineEdit(self.config.websocket_host)
-        self.websocket_host.setPlaceholderText("IP address or host")
+        initial_host = self.config.devices[0]["host"] if self.config.devices else ""
+        self.websocket_host = QLineEdit(initial_host)
+        self.websocket_host.setPlaceholderText("IP address or host (e.g. 192.168.1.50)")
         self.websocket_host.setMaxLength(253)
         self.websocket_host.setMinimumWidth(self.fontMetrics().horizontalAdvance("0" * 16) + 20)
         self.websocket_port = QLineEdit(str(self.config.websocket_port))
@@ -151,8 +152,24 @@ class NetworkPanel(QGroupBox):
     def _device_key(self, host: str, port: int) -> str:
         return f"{host}:{port}"
 
+    @staticmethod
+    def _is_untouched_local(dev: dict) -> bool:
+        host = str(dev.get("host", "")).strip().lower()
+        try:
+            port = int(dev.get("port", 12345))
+        except (TypeError, ValueError):
+            port = 12345
+        return (
+            host in ("", "127.0.0.1", "localhost")
+            and port == 12345
+            and not dev.get("auto_connect", False)
+            and not dev.get("name", "")
+        )
+
     def _restore_saved_devices(self) -> None:
         for dev in self.config.devices:
+            if self._is_untouched_local(dev):
+                continue
             host = dev["host"]
             port = int(dev.get("port", 12345))
             info = {"address": host, "name": dev.get("name", ""), "w": 0, "h": 0, "port": port, "v": 1}
@@ -161,13 +178,10 @@ class NetworkPanel(QGroupBox):
                 self._connect_output(host, port)
 
     def sync_endpoint_to_config(self) -> None:
-        manual_host = self.websocket_host.text().strip()
-        try:
-            manual_port = int(self.websocket_port.text())
-        except ValueError:
-            manual_port = self.config.websocket_port
         saved_by_key: dict[str, dict] = {
-            self._device_key(d["host"], int(d.get("port", 12345))): dict(d) for d in self.config.devices
+            self._device_key(d["host"], int(d.get("port", 12345))): dict(d)
+            for d in self.config.devices
+            if not self._is_untouched_local(d)
         }
         for key, row_data in self._device_rows.items():
             auto_chk: QCheckBox = row_data["auto_check"]
@@ -181,14 +195,6 @@ class NetworkPanel(QGroupBox):
                     "port": port,
                     "auto_connect": auto_chk.isChecked(),
                 }
-        if manual_host and not saved_by_key:
-            saved_by_key[self._device_key(manual_host, manual_port)] = {
-                "id": "dev-1",
-                "name": "",
-                "host": manual_host,
-                "port": manual_port,
-                "auto_connect": False,
-            }
         self.config.devices = list(saved_by_key.values())
         self.config.master = {
             "brightness": self.brightness_slider.value() / 100.0,
