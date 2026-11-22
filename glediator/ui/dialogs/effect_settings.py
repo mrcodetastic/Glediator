@@ -62,10 +62,16 @@ def create_param_editor(kind: str, default, minimum, maximum, step, value, *, ke
         return ColorButton(str(value if value is not None else default))
     if kind == "font":
         editor = QFontComboBox()
+        editor.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        editor.setMinimumContentsLength(8)
+        editor.setMinimumWidth(80)
         editor.setCurrentFont(QFont(str(value if value is not None else default)))
         return editor
     if kind == "choice":
         editor = QComboBox()
+        editor.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        editor.setMinimumContentsLength(8)
+        editor.setMinimumWidth(80)
         if key == "palette":
             choices = list(palette_names())
             if isinstance(minimum, (list, tuple)):

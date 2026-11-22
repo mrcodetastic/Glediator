@@ -117,7 +117,7 @@ class LayerInspector(QWidget):
         self._debounce.setInterval(50)
         self._debounce.timeout.connect(self._flush_params)
 
-        self.setMinimumWidth(335)
+        self.setMinimumWidth(355)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)
 
@@ -134,13 +134,17 @@ class LayerInspector(QWidget):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._content = QWidget()
         self._content_layout = QVBoxLayout(self._content)
+        self._content_layout.setContentsMargins(4, 4, 4, 4)
         scroll.setWidget(self._content)
         outer.addWidget(scroll, 1)
 
         # Blend / Opacity / Brightness
         mix_box = QGroupBox("Layer Mixing")
         mix_form = QFormLayout(mix_box)
+        mix_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         self.blend_combo = QComboBox()
+        self.blend_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.blend_combo.setMinimumContentsLength(6)
         self.blend_combo.addItems(list(MIX_MODES))
         self.blend_combo.currentTextChanged.connect(self._on_mix_changed)
         mix_form.addRow("Blend mode", self.blend_combo)
@@ -161,6 +165,7 @@ class LayerInspector(QWidget):
         # Effect Parameters
         self.params_box = QGroupBox("Effect Parameters")
         self.params_form = QFormLayout(self.params_box)
+        self.params_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         self._content_layout.addWidget(self.params_box)
 
         self.reset_btn = QPushButton("Reset to defaults")
@@ -177,10 +182,14 @@ class LayerInspector(QWidget):
 
         f_actions = QHBoxLayout()
         self.filter_add_combo = QComboBox()
+        self.filter_add_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.filter_add_combo.setMinimumContentsLength(6)
         self.filter_add_combo.addItems(list(FILTER_NAMES))
         add_f_btn = QPushButton("+ Add")
+        add_f_btn.setStyleSheet("padding:6px 10px;")
         add_f_btn.clicked.connect(self._add_filter)
         rem_f_btn = QPushButton("Remove")
+        rem_f_btn.setStyleSheet("padding:6px 10px;")
         rem_f_btn.clicked.connect(self._remove_filter)
         f_actions.addWidget(self.filter_add_combo, 1)
         f_actions.addWidget(add_f_btn)
@@ -188,6 +197,7 @@ class LayerInspector(QWidget):
         filter_layout.addLayout(f_actions)
 
         self.filter_params_form = QFormLayout()
+        self.filter_params_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         filter_layout.addLayout(self.filter_params_form)
         self._content_layout.addWidget(filter_box)
         self._content_layout.addStretch(1)
@@ -259,9 +269,8 @@ class LayerInspector(QWidget):
                 row_l = QHBoxLayout(row_w)
                 row_l.setContentsMargins(0, 0, 0, 0)
                 slider = QSlider(Qt.Orientation.Horizontal)
-                slider.setMinimumWidth(42)
-                editor.setMinimumWidth(108)
-                editor.setMaximumWidth(120)
+                slider.setMinimumWidth(36)
+                editor.setFixedWidth(96)
                 scale = 1 if kind == "int" else 1000
                 slider.setRange(round(float(low) * scale), round(float(high) * scale))
                 slider.setValue(round(float(val) * scale))
@@ -276,7 +285,7 @@ class LayerInspector(QWidget):
                     )
                 )
                 mod_btn = QPushButton("~")
-                mod_btn.setFixedWidth(28)
+                mod_btn.setFixedWidth(26)
                 mod_btn.setToolTip("Configure audio/LFO modulation")
                 if key in mod_map:
                     mod_btn.setStyleSheet("background:#d97706; color:white; padding:2px 4px;")
