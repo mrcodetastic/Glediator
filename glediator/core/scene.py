@@ -6,7 +6,51 @@ import numpy as np
 
 from glediator.core.frame import new_frame
 from glediator.core.pipeline import apply_filter, mix
-from glediator.effects import create_effect, default_effect_parameters, effect_names, sanitize_effect_parameters
+from glediator.effects import (
+    create_effect,
+    default_effect_parameters,
+    effect_names,
+    effect_settings,
+    sanitize_effect_parameters,
+)
+
+MODULATION_SOURCES = ("level", "peak", "bass", "mid", "treble", "beat", "lfo_sine", "lfo_saw")
+AUDIO_MOD_SOURCES = frozenset({"level", "peak", "bass", "mid", "treble", "beat"})
+
+
+def sanitize_modulations(generator_name: str, items: list | None) -> list[dict]:
+    if not isinstance(items, list):
+        return []
+    schema = effect_settings(generator_name)
+    result: list[dict] = []
+    for entry in items:
+        if not isinstance(entry, dict):
+            continue
+        param = str(entry.get("param", ""))
+        if param not in schema:
+            continue
+        kind, _default, low, high, _step = schema[param]
+        if kind not in ("int", "float"):
+            continue
+        source = str(entry.get("source", ""))
+        if source not in MODULATION_SOURCES:
+            continue
+        try:
+            amount = float(np.clip(float(entry.get("amount", 1.0)), 0.0, 2.0))
+            m_min = float(np.clip(float(entry.get("min", low)), low, high))
+            m_max = float(np.clip(float(entry.get("max", high)), low, high))
+            smoothing = float(np.clip(float(entry.get("smoothing", 0.3)), 0.0, 0.98))
+        except (TypeError, ValueError):
+            continue
+        result.append({
+            "param": param,
+            "source": source,
+            "amount": amount,
+            "min": m_min,
+            "max": m_max,
+            "smoothing": smoothing,
+        })
+    return result
 
 
 @dataclass
@@ -18,6 +62,7 @@ class Layer:
     filter_name: str = "None"
     mix_mode: str = "Add"
     parameters: dict = field(default_factory=dict)
+    modulations: list[dict] = field(default_factory=list)
 
 
 class Scene:
@@ -31,6 +76,8 @@ class Scene:
             for i in range(5)
         ]
         self._generators = [create_effect(layer.generator_name) for layer in self.layers]
+        self._mod_ema: list[dict[str, float]] = [{} for _ in range(5)]
+        self._last_applied_params: list[dict | None] = [None for _ in range(5)]
         self.active_layer = 0
         self._frame = new_frame(width, height)
 
@@ -47,6 +94,9 @@ class Scene:
         self.layers[index].generator_name = name
         self.layers[index].configured = True
         self.layers[index].parameters = default_effect_parameters(name)
+        self.layers[index].modulations = []
+        self._mod_ema[index].clear()
+        self._last_applied_params[index] = None
         self._generators[index] = create_effect(name)
         self.layers[index].enabled = True
 
@@ -62,6 +112,8 @@ class Scene:
         self._generators[index].cleanup()
         self.layers[index] = Layer(generator_name="Black", enabled=False, configured=False)
         self._generators[index] = create_effect("Black")
+        self._mod_ema[index].clear()
+        self._last_applied_params[index] = None
 
     def move_layer(self, source: int, destination: int) -> None:
         if source == destination:
@@ -71,13 +123,93 @@ class Scene:
             self._generators[destination],
             self._generators[source],
         )
+        self._mod_ema[source], self._mod_ema[destination] = self._mod_ema[destination], self._mod_ema[source]
+        self._last_applied_params[source], self._last_applied_params[destination] = (
+            self._last_applied_params[destination],
+            self._last_applied_params[source],
+        )
 
-    def render(self, time_seconds: float, audio_state: dict | None = None) -> np.ndarray:
+    def has_audio_modulation(self) -> bool:
+        return any(
+            layer.configured
+            and layer.enabled
+            and any(mod.get("source") in AUDIO_MOD_SOURCES for mod in layer.modulations)
+            for layer in self.layers
+        )
+
+    def _apply_modulations(
+        self,
+        index: int,
+        layer: Layer,
+        generator,
+        audio_state: dict | None,
+        mod_context: dict | None,
+    ) -> None:
+        if not layer.modulations:
+            if self._last_applied_params[index] is not None:
+                generator.configure(layer.parameters)
+                self._last_applied_params[index] = None
+            return
+
+        schema = effect_settings(layer.generator_name)
+        effective = dict(layer.parameters) if layer.parameters else default_effect_parameters(layer.generator_name)
+        sources: dict[str, float] = {}
+        if audio_state:
+            sources["level"] = float(audio_state.get("audio_level", 0.0))
+            sources["peak"] = float(audio_state.get("audio_peak", 0.0))
+            sources["bass"] = float(audio_state.get("audio_bass", 0.0))
+            sources["mid"] = float(audio_state.get("audio_mid", 0.0))
+            sources["treble"] = float(audio_state.get("audio_treble", 0.0))
+            sources["beat"] = 1.0 if audio_state.get("audio_beat") else 0.0
+        if mod_context:
+            for key in ("lfo_sine", "lfo_saw"):
+                if key in mod_context:
+                    sources[key] = float(mod_context[key])
+
+        ema_state = self._mod_ema[index]
+        for mod in layer.modulations:
+            param = mod["param"]
+            if param not in schema:
+                continue
+            raw = float(np.clip(sources.get(mod["source"], 0.0), 0.0, 1.0))
+            smoothing = float(mod.get("smoothing", 0.3))
+            ema_key = f"{param}:{mod['source']}"
+            prev = ema_state.get(ema_key, raw)
+            smoothed = smoothing * prev + (1.0 - smoothing) * raw
+            ema_state[ema_key] = smoothed
+            scaled = float(np.clip(float(mod["amount"]) * smoothed, 0.0, 1.0))
+            val = float(mod["min"]) + (float(mod["max"]) - float(mod["min"])) * scaled
+            kind = schema[param][0]
+            effective[param] = round(val) if kind == "int" else val
+
+        last = self._last_applied_params[index]
+        changed = last is None
+        if not changed:
+            for k, v in effective.items():
+                old = last.get(k)
+                if isinstance(v, (int, float)) and isinstance(old, (int, float)):
+                    if abs(float(v) - float(old)) > 1e-3:
+                        changed = True
+                        break
+                elif v != old:
+                    changed = True
+                    break
+        if changed:
+            generator.configure(effective)
+            self._last_applied_params[index] = effective
+
+    def render(
+        self,
+        time_seconds: float,
+        audio_state: dict | None = None,
+        mod_context: dict | None = None,
+    ) -> np.ndarray:
         self._frame.fill(0)
         has_layer = False
-        for layer, generator in zip(self.layers, self._generators, strict=True):
+        for index, (layer, generator) in enumerate(zip(self.layers, self._generators, strict=True)):
             if not layer.enabled:
                 continue
+            self._apply_modulations(index, layer, generator, audio_state, mod_context)
             image = generator.drawFrame(self.width, self.height, time_seconds, audio_state)
             image = apply_filter(image, layer.filter_name)
             if layer.brightness != 100:
@@ -91,9 +223,16 @@ class Scene:
             "name": self.name,
             "active_layer": self.active_layer,
             "layers": [
-                {"generator": layer.generator_name, "enabled": layer.enabled, "configured": layer.configured,
-                 "brightness": layer.brightness, "filter": layer.filter_name,
-                 "mix_mode": layer.mix_mode, "parameters": layer.parameters}
+                {
+                    "generator": layer.generator_name,
+                    "enabled": layer.enabled,
+                    "configured": layer.configured,
+                    "brightness": layer.brightness,
+                    "filter": layer.filter_name,
+                    "mix_mode": layer.mix_mode,
+                    "parameters": layer.parameters,
+                    "modulations": layer.modulations,
+                }
                 for layer in self.layers
             ],
         }
@@ -116,6 +255,8 @@ class Scene:
             parameters = sanitize_effect_parameters(name, saved.get("parameters"))
             effect.configure(parameters)
             self._generators[index] = effect
+            self._mod_ema[index].clear()
+            self._last_applied_params[index] = None
             self.layers[index] = Layer(
                 generator_name=name,
                 enabled=bool(saved.get("enabled", index == 0)),
@@ -132,6 +273,7 @@ class Scene:
                     else "Add"
                 ),
                 parameters=parameters,
+                modulations=sanitize_modulations(name, saved.get("modulations")),
             )
 
     def close(self) -> None:

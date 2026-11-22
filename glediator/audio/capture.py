@@ -6,6 +6,8 @@ from collections import deque
 
 import numpy as np
 
+from glediator.audio.features import AudioFeatureExtractor
+
 
 class AudioCapture:
     """Background system-output loopback or microphone capture and analysis.
@@ -32,6 +34,16 @@ class AudioCapture:
         self.level = 0.0
         self.peak = 0.0
         self.spectrum = np.zeros(self.SPECTRUM_BINS, dtype=np.float32)
+        self._extractor = AudioFeatureExtractor(self.SAMPLE_RATE, self.BLOCK_SIZE, self.SPECTRUM_BINS)
+        self._features: dict[str, float | bool] = {
+            "audio_bass": 0.0,
+            "audio_mid": 0.0,
+            "audio_treble": 0.0,
+            "audio_beat": False,
+            "audio_bpm": 0.0,
+            "audio_beat_phase": 0.0,
+        }
+        self._beat_pending = False
         self.last_error = ""
 
     def set_source(self, source: str) -> None:
@@ -76,14 +88,27 @@ class AudioCapture:
             self.level = 0.0
             self.peak = 0.0
             self.spectrum.fill(0)
+            self._beat_pending = False
+            self._features = {
+                "audio_bass": 0.0,
+                "audio_mid": 0.0,
+                "audio_treble": 0.0,
+                "audio_beat": False,
+                "audio_bpm": 0.0,
+                "audio_beat_phase": 0.0,
+            }
 
     def snapshot(self) -> dict:
         with self._lock:
-            return {
+            snap = {
                 "audio_level": self.level,
                 "audio_peak": self.peak,
                 "audio_spectrum": self.spectrum.copy(),
+                **self._features,
             }
+            snap["audio_beat"] = self._beat_pending
+            self._beat_pending = False
+            return snap
 
     @classmethod
     def _analyse_unscaled(cls, samples: np.ndarray) -> tuple[float, float, np.ndarray]:
@@ -144,6 +169,7 @@ class AudioCapture:
                         analysis_window[: -mono.size] = analysis_window[mono.size :]
                         analysis_window[-mono.size :] = mono
                     raw_level, raw_peak, raw_spectrum = self._analyse_unscaled(analysis_window)
+                    feats = self._extractor.process(raw_spectrum)
                     with self._lock:
                         if self._auto_sensitivity and raw_level > 1e-5:
                             self._level_history.append(raw_level)
@@ -157,6 +183,9 @@ class AudioCapture:
                         peak = max(min(1.0, raw_peak * gain), self.peak * 0.94)
                         spectrum = np.clip(raw_spectrum * gain, 0, 1).astype(np.float32)
                         self.level, self.peak, self.spectrum = level, peak, spectrum
+                        self._features = feats
+                        if feats.get("audio_beat"):
+                            self._beat_pending = True
         except Exception as exc:
             self.last_error = f"Audio input unavailable ({self._source}): {exc}"
             self._retry_at = time.monotonic() + self._backoff
