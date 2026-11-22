@@ -25,12 +25,27 @@ def test_inspector_undo_preview_and_docks(qtbot, monkeypatch):
     window.undo_stack.redo()
     assert engine.scene_snapshot("left")["layers"][1]["generator"] == "Wave"
 
-    # Live inspector edit applies within 150ms
+    # Live inspector edit applies within 150ms and preserves QLineEdit focus while typing
     window.inspector.inspect("left", 1)
     speed_spin = window.inspector._editors["speed"]
     speed_spin.setValue(4.5)
     qtbot.wait(120)
     assert abs(engine.scene_snapshot("left")["layers"][1]["parameters"]["speed"] - 4.5) < 1e-3
+
+    text_idx = window.source_a_panel.add_effect_by_name("Scrolling Text")
+    assert text_idx == 2
+    window.show()
+    window.inspector_dock.show()
+    window.inspector.inspect("left", text_idx)
+    text_edit = window.inspector._editors["text"]
+    text_edit.setFocus()
+    text_edit.setText("")
+    for ch in "MERRY":
+        qtbot.keyClick(text_edit, ch)
+        qtbot.wait(70)
+    assert window.inspector._editors["text"] is text_edit
+    assert text_edit.hasFocus()
+    assert engine.scene_snapshot("left")["layers"][text_idx]["parameters"]["text"] == "MERRY"
 
     # Preview modes and Performance dock update cleanly
     window.mix_preview.set_mode("dots")

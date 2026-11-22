@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -105,6 +106,7 @@ class LayerInspector(QWidget):
         self._side: str = "left"
         self._layer_index: int = -1
         self._gen_name: str = ""
+        self._inspected_target: tuple[str, int, str] | None = None
         self._editors: dict[str, QWidget] = {}
         self._mod_buttons: dict[str, QPushButton] = {}
         self._before_params: dict = {}
@@ -209,6 +211,7 @@ class LayerInspector(QWidget):
         self._side = side
         self._layer_index = layer_index
         if layer_index < 0:
+            self._inspected_target = None
             self.header_label.setText("No layer selected")
             self.desc_label.setText("")
             self.setEnabled(False)
@@ -217,6 +220,7 @@ class LayerInspector(QWidget):
         snap = self.engine.scene_snapshot(side)
         layers = snap.get("layers", [])
         if not (0 <= layer_index < len(layers)) or not layers[layer_index].get("configured"):
+            self._inspected_target = None
             self.setEnabled(False)
             return
 
@@ -224,6 +228,10 @@ class LayerInspector(QWidget):
         self._syncing = True
         self.setEnabled(True)
         self._gen_name = str(layer.get("generator", "Black"))
+        target = (side, layer_index, self._gen_name)
+        same_target = target == self._inspected_target
+        self._inspected_target = target
+
         side_label = "Source A" if side == "left" else "Source B"
         self.header_label.setText(f"{side_label} · Layer {layer_index + 1} · {self._gen_name}")
         self.desc_label.setText(effect_descriptions().get(self._gen_name, ""))
@@ -237,9 +245,43 @@ class LayerInspector(QWidget):
         self._before_params = dict(default_effect_parameters(self._gen_name))
         self._before_params.update(layer.get("parameters", {}))
 
-        self._rebuild_param_editors(self._before_params)
+        if same_target and set(self._editors) == set(effect_settings(self._gen_name)):
+            self._sync_param_editors(self._before_params)
+        else:
+            self._rebuild_param_editors(self._before_params)
         self._refresh_filter_list()
         self._syncing = False
+
+    def _sync_param_editors(self, values: dict) -> None:
+        schema = effect_settings(self._gen_name)
+        mod_map = {m["param"]: m for m in self._modulations}
+        for key, spec in schema.items():
+            kind, default, _low, _high, _step = spec
+            val = values.get(key, default)
+            editor = self._editors.get(key)
+            if editor is None:
+                continue
+            if kind == "bool":
+                editor.setChecked(bool(val))
+            elif kind in ("str", "file"):
+                text = str(val)
+                if editor.text() != text:
+                    editor.setText(text)
+            elif kind == "color":
+                editor.set_color(str(val))
+            elif kind == "font":
+                editor.setCurrentFont(QFont(str(val)))
+            elif kind == "choice":
+                editor.setCurrentText(str(val))
+            elif kind == "int":
+                editor.setValue(int(val))
+            else:
+                editor.setValue(float(val))
+            btn = self._mod_buttons.get(key)
+            if btn:
+                btn.setStyleSheet(
+                    "background:#d97706; color:white; padding:2px 4px;" if key in mod_map else "padding:2px 4px;"
+                )
 
     def _clear_form(self, form: QFormLayout) -> None:
         while form.rowCount() > 0:

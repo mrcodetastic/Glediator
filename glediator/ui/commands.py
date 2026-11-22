@@ -56,6 +56,7 @@ class SetParametersCommand(QUndoCommand):
         self.before = copy.deepcopy(before)
         self.after = copy.deepcopy(after)
         self.on_sync = on_sync
+        self._first = True
         self._timestamp = time.monotonic()
 
     def id(self) -> int:
@@ -75,6 +76,9 @@ class SetParametersCommand(QUndoCommand):
         return True
 
     def redo(self) -> None:
+        if self._first:
+            self._first = False
+            return
         self.engine.set_generator_parameters(self.side, self.layer_index, self.after)
         self.on_sync()
 
