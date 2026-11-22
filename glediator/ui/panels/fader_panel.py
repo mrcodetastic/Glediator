@@ -22,7 +22,7 @@ class FaderPanel(QGroupBox):
     swap_scenes_requested = Signal()
 
     def __init__(self, engine: RenderEngine, parent: QWidget | None = None) -> None:
-        super().__init__("FINAL OUTPUT & MASTER", parent)
+        super().__init__("FINAL OUTPUT · MASTER", parent)
         self.engine = engine
 
         layout = QVBoxLayout(self)

@@ -58,6 +58,7 @@ class NetworkPanel(QGroupBox):
         self.device_list = QListWidget()
         self.device_list.setMinimumHeight(76)
         self.device_list.setMaximumHeight(180)
+        self.device_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.device_list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         layout.addWidget(self.device_list)
 
@@ -258,8 +259,9 @@ class NetworkPanel(QGroupBox):
         row_layout.setContentsMargins(5, 2, 5, 2)
 
         dot = QLabel("●")
-        dot.setFixedWidth(14)
+        dot.setFixedWidth(12)
         label = QLabel()
+        label.setMinimumWidth(0)
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         auto_chk = QCheckBox("Auto")
         auto_chk.setToolTip("Automatically reconnect on startup")
@@ -267,15 +269,15 @@ class NetworkPanel(QGroupBox):
             auto_chk.setChecked(auto_connect)
 
         connect_button = QPushButton("Connect")
-        connect_button.setMinimumWidth(92)
-        connect_button.setMinimumHeight(32)
+        connect_button.setMinimumWidth(82)
+        connect_button.setMinimumHeight(30)
         connect_button.clicked.connect(lambda _c=False, k=key: self._toggle_device_output(k))
 
         row_layout.addWidget(dot)
         row_layout.addWidget(label, 1)
         row_layout.addWidget(auto_chk)
         row_layout.addWidget(connect_button)
-        item.setSizeHint(QSize(max(280, self.device_list.viewport().width()), 44))
+        item.setSizeHint(QSize(0, 48))
         self.device_list.setItemWidget(item, row)
 
         self._device_rows[key] = {
@@ -298,16 +300,16 @@ class NetworkPanel(QGroupBox):
     def _refresh_row_label(self, key: str) -> None:
         data = self._device_rows[key]
         title = data["name"] or data["host"]
-        endpoint = f"{data['host']}:{data['port']}"
-        parts = [title] if title == data["host"] else [f"{title} ({endpoint})"]
-        if title == data["host"]:
-            parts = [endpoint]
+        meta = [f"{data['host']}:{data['port']}"]
         if data["size"]:
-            parts.append(f"{data['size'][0]}×{data['size'][1]}")
-        parts.append(f"v{data['proto_v']}")
+            meta.append(f"{data['size'][0]}×{data['size'][1]}")
+        meta.append(f"v{data['proto_v']}")
         if data["stale"]:
-            parts.append("stale")
-        data["label"].setText("  ·  ".join(parts))
+            meta.append("stale")
+        sub = " · ".join(meta)
+        data["label"].setText(
+            f"<b>{title}</b><br><span style='color:#8ea0b4; font-size:8.5pt;'>{sub}</span>"
+        )
 
     def _mark_stale(self, address: str, stale: bool) -> None:
         for key, data in self._device_rows.items():

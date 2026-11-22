@@ -198,6 +198,8 @@ class MainWindow(QMainWindow):
     def _apply_theme(self, theme: str) -> None:
         self.config.ui["theme"] = theme
         self.setStyleSheet(build_stylesheet(theme))
+        for preview in (self.left_preview, self.right_preview, self.mix_preview):
+            preview.apply_theme(theme)
 
     def _open_effects_folder(self) -> None:
         USER_EFFECTS_DIR.mkdir(parents=True, exist_ok=True)

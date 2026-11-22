@@ -86,7 +86,7 @@ def build_stylesheet(theme: str = "dark") -> str:
         QListWidget::item:selected {{ background:{p['selected']}; color:{p['title']}; }}
         QComboBox, QSpinBox, QDoubleSpinBox {{
             background:{p['input_bg']}; border:1px solid {p['input_border']};
-            border-radius:5px; padding:6px; min-width:105px;
+            border-radius:5px; padding:5px; min-width:68px;
         }}
         QLineEdit {{
             background:{p['input_bg']}; border:1px solid {p['input_border']}; border-radius:5px; padding:6px;

@@ -9,17 +9,13 @@ from PySide6.QtWidgets import QGroupBox, QLabel, QMenu, QSizePolicy, QVBoxLayout
 class FramePreview(QGroupBox):
     def __init__(self, title: str, accent: str, matrix_width: int = 64, matrix_height: int = 32) -> None:
         super().__init__(title)
+        self._accent = accent
         self._aspect = max(1, matrix_width) / max(1, matrix_height)
         self._source_image: QImage | None = None
         self._mode: str = "pixels"  # "pixels" | "dots"
         self._badge: str = ""
         self.setObjectName("previewCard")
-        self.setStyleSheet(
-            f"QGroupBox#previewCard {{ background:#111923; border:1px solid #263343; "
-            f"border-top:3px solid {accent}; border-radius:9px; margin-top:10px; padding:10px; }}"
-            "QGroupBox#previewCard::title { subcontrol-origin:margin; left:12px; "
-            "padding:0 5px; color:#a8b8c9; font-size:9pt; font-weight:600; letter-spacing:1px; }"
-        )
+        self.apply_theme("dark")
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         size_policy.setHeightForWidth(True)
         self.setSizePolicy(size_policy)
@@ -35,6 +31,18 @@ class FramePreview(QGroupBox):
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def apply_theme(self, theme: str = "dark") -> None:
+        if theme == "light":
+            bg, border, title_col = "#ffffff", "#cfd8e3", "#334659"
+        else:
+            bg, border, title_col = "#111923", "#263343", "#a8b8c9"
+        self.setStyleSheet(
+            f"QGroupBox#previewCard {{ background:{bg}; border:1px solid {border}; "
+            f"border-top:3px solid {self._accent}; border-radius:9px; margin-top:10px; padding:10px; }}"
+            f"QGroupBox#previewCard::title {{ subcontrol-origin:margin; left:12px; "
+            f"padding:0 5px; color:{title_col}; font-size:9pt; font-weight:600; letter-spacing:1px; }}"
+        )
 
     def set_mode(self, mode: str) -> None:
         if mode in ("pixels", "dots"):

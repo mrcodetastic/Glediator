@@ -117,6 +117,7 @@ class LayerInspector(QWidget):
         self._debounce.setInterval(50)
         self._debounce.timeout.connect(self._flush_params)
 
+        self.setMinimumWidth(335)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)
 
@@ -130,6 +131,7 @@ class LayerInspector(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._content = QWidget()
         self._content_layout = QVBoxLayout(self._content)
         scroll.setWidget(self._content)
@@ -257,6 +259,8 @@ class LayerInspector(QWidget):
                 row_l = QHBoxLayout(row_w)
                 row_l.setContentsMargins(0, 0, 0, 0)
                 slider = QSlider(Qt.Orientation.Horizontal)
+                slider.setMinimumWidth(60)
+                editor.setMaximumWidth(82)
                 scale = 1 if kind == "int" else 1000
                 slider.setRange(round(float(low) * scale), round(float(high) * scale))
                 slider.setValue(round(float(val) * scale))
@@ -274,7 +278,9 @@ class LayerInspector(QWidget):
                 mod_btn.setFixedWidth(28)
                 mod_btn.setToolTip("Configure audio/LFO modulation")
                 if key in mod_map:
-                    mod_btn.setStyleSheet("background:#d97706; color:white;")
+                    mod_btn.setStyleSheet("background:#d97706; color:white; padding:2px 4px;")
+                else:
+                    mod_btn.setStyleSheet("padding:2px 4px;")
                 mod_btn.clicked.connect(
                     lambda _c=False, k=key, lo=low, hi=high: self._edit_modulation(k, float(lo), float(hi))
                 )
@@ -336,7 +342,9 @@ class LayerInspector(QWidget):
         self.engine.set_layer_modulations(self._side, self._layer_index, self._modulations)
         btn = self._mod_buttons.get(param_name)
         if btn:
-            btn.setStyleSheet("background:#d97706; color:white;" if new_entry else "")
+            btn.setStyleSheet(
+                "background:#d97706; color:white; padding:2px 4px;" if new_entry else "padding:2px 4px;"
+            )
 
     def _on_mix_changed(self, *_args) -> None:
         if self._syncing or self._layer_index < 0:
