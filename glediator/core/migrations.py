@@ -24,8 +24,35 @@ def _migrate_v1_to_v2(data: dict) -> dict:
     return updated
 
 
+def _migrate_v2_to_v3(data: dict) -> dict:
+    updated = deepcopy(data)
+    host = str(updated.pop("websocket_host", "127.0.0.1")).strip() or "127.0.0.1"
+    try:
+        port = int(updated.pop("websocket_port", 12345))
+    except (TypeError, ValueError):
+        port = 12345
+    if "devices" not in updated or not isinstance(updated["devices"], list):
+        updated["devices"] = [
+            {
+                "id": "dev-1",
+                "name": "",
+                "host": host,
+                "port": max(1, min(65535, port)),
+                "auto_connect": False,
+            }
+        ]
+    updated.setdefault("master", {"brightness": 1.0, "gamma": 1.0})
+    updated.setdefault("playlists", [])
+    updated.setdefault("controls", {"keyboard": {}, "midi": [], "osc": {"enabled": False, "port": 9000}})
+    updated.setdefault("palettes", {})
+    updated.setdefault("ui", {"theme": "dark"})
+    updated["config_version"] = 3
+    return updated
+
+
 MIGRATIONS: dict[int, Callable[[dict], dict]] = {
     1: _migrate_v1_to_v2,
+    2: _migrate_v2_to_v3,
 }
 
 LATEST_CONFIG_VERSION = max(MIGRATIONS) + 1

@@ -36,14 +36,14 @@ def test_v1_config_migrates_and_strips_mapping(tmp_path: Path):
     }
     path.write_text(json.dumps(v1_data), encoding="utf-8")
     loaded = EngineConfig.load(path)
-    assert loaded.config_version == 2
+    assert loaded.config_version == 3
     assert loaded.websocket_host == "192.168.1.44"
     assert loaded.websocket_port == 9999
     assert "mapping" not in loaded.presets[0]
     loaded.save(path)
     saved = json.loads(path.read_text(encoding="utf-8"))
     assert "mapping" not in saved
-    assert saved["config_version"] == 2
+    assert saved["config_version"] == 3
 
 
 def test_atomic_save_and_backup_recovery(tmp_path: Path):

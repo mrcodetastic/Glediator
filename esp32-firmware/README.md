@@ -1,28 +1,24 @@
 # ESP32 HUB75 firmware
 
-This standalone Arduino sketch receives Glediator frames, advertises itself on the LAN, and displays completed frames on a HUB75 matrix using the `ESP32-HUB75-MatrixPanel-I2S-DMA` library with double buffering.
+This standalone Arduino sketch receives Glediator frames, advertises itself on the LAN, and displays completed frames on a HUB75 matrix using `ESP32-HUB75-MatrixPanel-I2S-DMA` with double buffering.
 
 ## Libraries
 
-Install these Arduino libraries:
-
 - **ESP32-HUB75-MatrixPanel-I2S-DMA** by mrcodetastic
 - **WebSockets** by Markus Sattler (Links2004)
-- ESP32 Arduino core (includes `WiFi`, `WiFiUdp`, and `ESPmDNS`)
+- ESP32 Arduino core (`WiFi`, `WiFiUdp`, `ESPmDNS`)
 
-Open `esp32-firmware.ino` in Arduino IDE. Edit `WIFI_SSID` and `WIFI_PASSWORD`, select the correct ESP32 board/port, then compile and upload. The sketch uses the HUB75 library's default pin mapping; adjust `HUB75_I2S_CFG` pin settings for a custom board/panel wiring.
+## Configuration
 
-## Panel and pixel order
+Copy `config.example.h` to `config.h` (`config.h` is gitignored) and edit your Wi-Fi credentials and panel layout (`PANEL_WIDTH`, `PANEL_HEIGHT`, `PANEL_CHAIN`). If `config.h` does not exist, the sketch falls back to `config.example.h`.
 
-The defaults are one 64×32 panel. Set `PANEL_WIDTH`, `PANEL_HEIGHT`, and `PANEL_CHAIN` to match the physical setup and the Python app's **File → LED Panel Config** dimensions (`MATRIX_WIDTH = PANEL_WIDTH * PANEL_CHAIN`). The Python app always sends pixels in row-major order from `(0, 0)` to `(W - 1, H - 1)`; any physical panel chaining or wiring layout is handled in the ESP32 firmware.
-
-For dimensions larger than the default, the sketch raises `WEBSOCKETS_MAX_DATA_SIZE` to fit one complete frame message. The WebSockets library and ESP32 heap must support a message of `2 + width × height × 2` bytes; for example, 128×128 needs 32,770 bytes.
+The Python app always sends pixels in row-major order from `(0, 0)` to `(W - 1, H - 1)` where `W = PANEL_WIDTH * PANEL_CHAIN` and `H = PANEL_HEIGHT`. Any physical panel chaining or wiring transform is handled in the receiver.
 
 ## Discovery and WebSocket protocol
 
-- The ESP32 advertises `_ws._tcp` via mDNS as `codetastic-panel.local` and periodically broadcasts the exact UDP payload `CODETASTIC` to port **20586**.
-- It accepts WebSocket connections on port **12345**.
-- Each binary WebSocket message must be exactly `0x81 0x81` followed by `width × height` row-major RGB565 pixels, high byte first. The sketch rejects frames with a wrong marker or byte count.
-- The complete frame is decoded into a staging array, copied to the HUB75 back buffer, and displayed with `flipDMABuffer()` only after all pixels are ready. No incomplete network frame is presented.
+See [`docs/protocol.md`](../docs/protocol.md) for full details:
 
-The sketch has no authentication and is intended for a trusted local network. Open TCP port 12345 and allow UDP broadcast on port 20586 through the LAN firewall.
+- Periodically broadcasts a v2 `CODETASTIC {...}` UDP beacon on port **20586**.
+- Accepts WebSocket connections on port **12345** and sends a `hello` JSON packet declaring dimensions and capabilities (`delta`, `ack`, `rle`, `brightness`).
+- Supports `81 81` full frames (v1 & v2), `81 82` delta rectangles, `81 83` RLE frames, `ack` flow-control replies after `flipDMABuffer()`, and `brightness` commands.
+- Shows the IP address on the panel for 5 seconds at boot and displays `NO SIGNAL` after 5 seconds without incoming frames.

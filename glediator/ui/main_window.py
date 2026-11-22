@@ -136,6 +136,7 @@ class MainWindow(QMainWindow):
         self.network_panel = NetworkPanel(self.engine, self.config)
         self.network_panel.status_message.connect(lambda msg: self.statusBar().showMessage(msg, 4000))
         self.network_panel.beacon_status_changed.connect(lambda msg: self.beacon_status.setText(msg))
+        self.network_panel.matrix_size_requested.connect(self._apply_matrix_size)
 
         for preview, panel in (
             (self.left_preview, self.source_a_panel),
@@ -157,6 +158,15 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(columns, 1)
         self.statusBar().showMessage("Ready · output is disabled until connected")
+
+    def _apply_matrix_size(self, width: int, height: int) -> None:
+        self.engine.set_matrix_size(width, height)
+        self.config.width, self.config.height = width, height
+        for preview in (self.left_preview, self.right_preview, self.mix_preview):
+            preview.set_matrix_size(width, height)
+        self._relayout_previews()
+        self._save_settings()
+        self.statusBar().showMessage(f"LED panel set to {width} × {height}", 4000)
 
     def _save_preset(self, name: str) -> None:
         preset = {"name": name, "state": self.engine.export_state()}
@@ -206,8 +216,8 @@ class MainWindow(QMainWindow):
 
     def _refresh(self) -> None:
         self.network_panel.handle_discovery_events(self.discovery.poll_events())
-        if self.network_panel.output:
-            self.network_panel.update_controls()
+        eng_status = self.engine.status()
+        self.network_panel.update_controls(eng_status.outputs)
         frames = self.engine.snapshot()
         if not frames:
             return
@@ -215,7 +225,6 @@ class MainWindow(QMainWindow):
         self.mix_preview.set_frame(frames["mixed"])
         self.right_preview.set_frame(frames["right"])
 
-        eng_status = self.engine.status()
         status = f"●  {eng_status.fps:.0f} FPS  ·  {self.config.width} × {self.config.height}"
         if eng_status.layer_errors:
             (side, idx), msg = next(iter(eng_status.layer_errors.items()))
@@ -225,11 +234,19 @@ class MainWindow(QMainWindow):
         if eng_status.audio_error:
             status += "  ·  AUDIO INPUT ERROR"
             self.statusBar().showMessage(eng_status.audio_error)
-        if self.network_panel.output:
-            output = self.network_panel.output
-            status += "  ·  OUTPUT ONLINE" if output.connected else "  ·  CONNECTING"
-            if output.last_error:
-                self.statusBar().showMessage(output.last_error)
+        if eng_status.outputs:
+            states = [st.state for st in eng_status.outputs.values()]
+            if any(s == "mismatch" for s in states):
+                status += "  ·  SIZE MISMATCH"
+            elif any(s == "online" for s in states):
+                status += "  ·  OUTPUT ONLINE"
+            elif any(s == "connecting" for s in states):
+                status += "  ·  CONNECTING"
+            elif any(s == "error" for s in states):
+                status += "  ·  OUTPUT ERROR"
+            errors = [st.last_error for st in eng_status.outputs.values() if st.last_error]
+            if errors:
+                self.statusBar().showMessage(errors[0])
         self.fps_label.setText(status)
 
     def closeEvent(self, event) -> None:

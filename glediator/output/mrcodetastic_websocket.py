@@ -1,92 +1,18 @@
 from __future__ import annotations
 
-import queue
-import threading
-import time
+from urllib.parse import urlsplit
 
-import numpy as np
-
-from glediator.core.frame import to_rgb565
+from glediator.output.websocket_output import OutputStatus, WebSocketOutput
 
 
-class MrCodetasticWebSocketOutput:
-    """Send one complete row-major RGB565 frame per WebSocket binary message."""
-
-    FRAME_MARKER = b"\x81\x81"
+class MrCodetasticWebSocketOutput(WebSocketOutput):
+    """Compatibility wrapper accepting a ws://host:port URL."""
 
     def __init__(self, url: str) -> None:
-        self.url = url
-        self._queue: queue.Queue[np.ndarray | None] = queue.Queue(maxsize=2)
-        self._thread: threading.Thread | None = None
-        self._stop = threading.Event()
-        self.connected = False
-        self.last_error = ""
-        self._frame_id = 0
+        parsed = urlsplit(url)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 12345
+        super().__init__(host=host, port=port)
 
-    def start(self) -> None:
-        if self._thread and self._thread.is_alive():
-            return
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._worker, name="MrCodetasticWebSocket", daemon=True)
-        self._thread.start()
 
-    def stop(self) -> None:
-        self._stop.set()
-        try:
-            self._queue.put_nowait(None)
-        except queue.Full:
-            pass
-        if self._thread and self._thread is not threading.current_thread():
-            self._thread.join(timeout=2)
-
-    def send(self, frame: np.ndarray) -> None:
-        copy = np.asarray(frame, dtype=np.uint8).copy()
-        try:
-            self._queue.put_nowait(copy)
-        except queue.Full:
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                pass
-            try:
-                self._queue.put_nowait(copy)
-            except queue.Full:
-                pass
-
-    def _worker(self) -> None:
-        from websockets.sync.client import connect
-
-        while not self._stop.is_set():
-            try:
-                with connect(self.url, open_timeout=2, close_timeout=1, max_size=None) as websocket:
-                    self.connected = True
-                    self.last_error = ""
-                    last_sent_frame = None
-                    while not self._stop.is_set():
-                        try:
-                            frame = self._queue.get(timeout=0.2)
-                        except queue.Empty:
-                            continue
-                        if frame is None:
-                            break
-                        if self._frames_match(frame, last_sent_frame):
-                            continue
-                        websocket.send(self.encode_frame(frame))
-                        last_sent_frame = frame
-            except Exception as exc:  # Network failures should never stop rendering.
-                self.connected = False
-                self.last_error = str(exc)
-                time.sleep(1.0)
-        self.connected = False
-
-    @staticmethod
-    def _frames_match(frame: np.ndarray, previous: np.ndarray | None) -> bool:
-        """Exact comparison is inexpensive for LED matrices and avoids hash collisions."""
-        return previous is not None and frame.shape == previous.shape and np.array_equal(frame, previous)
-
-    @classmethod
-    def encode_frame(cls, frame: np.ndarray) -> bytes:
-        """Encode marker 0x81 0x81 followed by row-major RGB565 big-endian pixels."""
-        contiguous = np.ascontiguousarray(frame, dtype=np.uint8)
-        pixels = to_rgb565(contiguous).reshape(-1)
-        return cls.FRAME_MARKER + pixels.astype(">u2", copy=False).tobytes()
+__all__ = ["MrCodetasticWebSocketOutput", "OutputStatus", "WebSocketOutput"]

@@ -46,8 +46,21 @@ class RenderEngine:
         self.audio_capture = AudioCapture()
         self._audio_active = False
         self.outputs = OutputHub()
+        self.outputs.set_processing(
+            config.master.get("brightness", 1.0),
+            config.master.get("gamma", 1.0),
+        )
         if config.live_state:
             self.restore_state(config.live_state)
+
+    def set_master(self, brightness: float | None = None, gamma: float | None = None) -> None:
+        with self._lock:
+            cur_b, cur_g = self.outputs.processing_settings()
+            new_b = cur_b if brightness is None else max(0.0, min(1.0, float(brightness)))
+            new_g = cur_g if gamma is None else max(0.1, min(4.0, float(gamma)))
+            self.config.master["brightness"] = new_b
+            self.config.master["gamma"] = new_g
+        self.outputs.set_processing(new_b, new_g)
 
     def start(self) -> None:
         if self.running:

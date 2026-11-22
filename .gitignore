@@ -1,6 +1,7 @@
 .settings
 autoSave.gled
 bin
+esp32-firmware/config.h
 
 # Python bytecode and interpreter caches
 __pycache__
