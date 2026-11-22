@@ -259,8 +259,9 @@ class LayerInspector(QWidget):
                 row_l = QHBoxLayout(row_w)
                 row_l.setContentsMargins(0, 0, 0, 0)
                 slider = QSlider(Qt.Orientation.Horizontal)
-                slider.setMinimumWidth(60)
-                editor.setMaximumWidth(82)
+                slider.setMinimumWidth(42)
+                editor.setMinimumWidth(108)
+                editor.setMaximumWidth(120)
                 scale = 1 if kind == "int" else 1000
                 slider.setRange(round(float(low) * scale), round(float(high) * scale))
                 slider.setValue(round(float(val) * scale))
