@@ -306,8 +306,15 @@ class Scene:
             if not isinstance(saved, dict):
                 continue
             name = saved.get("generator", "Black")
-            if name == "Expanding Objects":
-                name = "Expanding Circles"
+            legacy_aliases = {
+                "Expanding Objects": "Expanding Circles",
+                "Falling Objects": "Falling Snow",
+                "FireKoz": "Fire",
+                "Spin": "Spiral",
+                "Simple Spectrum": "Spectrum Analyser",
+                "Maze": "3D Maze",
+            }
+            name = legacy_aliases.get(name, name)
             if name not in effect_names():
                 name = "Black"
             self._generators[index].cleanup()

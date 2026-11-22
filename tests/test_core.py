@@ -162,6 +162,62 @@ def test_new_aurora_patterns_and_expanding_circles_name():
     assert scene.layers[0].generator_name == "Expanding Circles"
 
 
+def test_effect_catalog_updates_and_visual_behavior():
+    from glediator.effects import default_effect_parameters
+
+    names = set(generator_names())
+    removed = {
+        "FireKoz",
+        "Falling Objects",
+        "Green Scroll",
+        "Fading Pixel",
+        "Maze",
+        "Munch",
+        "Simple Spectrum",
+        "Spin",
+        "Snake",
+    }
+    assert names.isdisjoint(removed)
+    assert {"Fire", "Falling Snow", "Noise Smearing", "Pendulum Wave", "Starfield", "3D Maze"}.issubset(names)
+
+    # Audio defaults
+    assert default_effect_parameters("Spectrum Analyser")["sensitivity"] == 1.0
+    assert default_effect_parameters("VU Meter")["auto_sensitivity"] == "On"
+
+    # Upright Fire: bottom rows hotter/brighter than top rows
+    fire_frame = _render_effect("Fire", 32, 24, 0.5)
+    assert fire_frame[-3:].mean() > fire_frame[:3].mean() * 2.0
+
+    # Falling Snow, Pendulum Wave, Starfield, 3D Maze produce active non-black frames
+    for name in ("Falling Snow", "Pendulum Wave", "Starfield", "3D Maze"):
+        eff = create_effect(name)
+        fr0 = eff.drawFrame(64, 32, 0.0)
+        fr1 = eff.drawFrame(64, 32, 0.5)
+        assert fr0.shape == (32, 64, 3)
+        assert np.count_nonzero(fr1) > 0
+        assert not np.array_equal(fr0, fr1)
+
+    # Noise Smearing responds visibly to speed and scale parameters
+    ns_slow = create_effect("Noise Smearing")
+    ns_slow._rng = np.random.default_rng(7)
+    ns_slow.configure({"speed": 0.2, "scale": 0.3, "palette": "Aurora"})
+    slow_a = ns_slow.drawFrame(32, 16, 0.0)
+    slow_b = ns_slow.drawFrame(32, 16, 0.1)
+
+    ns_fast = create_effect("Noise Smearing")
+    ns_fast._rng = np.random.default_rng(7)
+    ns_fast.configure({"speed": 6.0, "scale": 4.0, "palette": "Aurora"})
+    ns_fast.drawFrame(32, 16, 0.0)
+    fast_b = ns_fast.drawFrame(32, 16, 0.1)
+    assert not np.array_equal(slow_a, slow_b)
+    assert not np.array_equal(slow_b, fast_b)
+
+    # Legacy preset names restore gracefully
+    scene = Scene("legacy", 16, 8)
+    scene.restore({"layers": [{"generator": "Maze"}, {"generator": "Falling Objects"}, {"generator": "FireKoz"}]})
+    assert [scene.layers[i].generator_name for i in range(3)] == ["3D Maze", "Falling Snow", "Fire"]
+
+
 def test_settings_persist_endpoint_and_live_scene(tmp_path: Path):
     config_path = tmp_path / "settings.json"
     config = EngineConfig(

@@ -426,7 +426,7 @@ class RenderEngine:
             for layer in scene.layers
             if layer.configured
             and layer.enabled
-            and layer.generator_name in ("VU Meter", "Simple Spectrum", "Spectrum Analyser")
+            and layer.generator_name in ("VU Meter", "Spectrum Analyser")
         ]
         mod_audio = self.left_scene.has_audio_modulation() or self.right_scene.has_audio_modulation()
         if not audio_layers and not mod_audio:

@@ -9,7 +9,7 @@ class VUMeterEffect(ConfiguredEffect):
     category = "Audio"
     settings = {
         "sensitivity": ("float", 2.5, 0.2, 8.0, 0.1),
-        "auto_sensitivity": ("choice", "Off", ("Off", "On"), "", ""),
+        "auto_sensitivity": ("choice", "On", ("Off", "On"), "", ""),
         "source": ("choice", "System Output", ("System Output", "Microphone"), "", ""),
     }
 

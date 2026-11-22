@@ -8,7 +8,7 @@ class SpectrumAnalyserEffect(ConfiguredEffect):
     description = "Configurable audio-frequency bars, averaged from a 1024-bin FFT."
     category = "Audio"
     settings = {
-        "sensitivity": ("float", 4.0, 0.2, 12.0, 0.1),
+        "sensitivity": ("float", 1.0, 0.2, 12.0, 0.1),
         "auto_sensitivity": ("choice", "Off", ("Off", "On"), "", ""),
         "source": ("choice", "System Output", ("System Output", "Microphone"), "", ""),
         "bins": ("int", 0, 0, 512, 1),
@@ -42,7 +42,7 @@ class SpectrumAnalyserEffect(ConfiguredEffect):
         count = min(max_bins, requested_bins if requested_bins > 0 else max_bins)
         spectrum = np.asarray(p.get("audio_spectrum", []), dtype=np.float32)
         bars = self._compress_spectrum(spectrum, count)
-        bars = np.clip(bars * float(p.get("sensitivity", 4.0)), 0, 1)
+        bars = np.clip(bars * float(p.get("sensitivity", 1.0)), 0, 1)
         bar_heights = (bars * height).astype(int)
 
         out = np.zeros((height, width, 3), dtype=np.uint8)

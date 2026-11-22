@@ -17,7 +17,7 @@ Glediator uses a dual-deck live mixer layout:
 
 ## 2. Effects & Media
 
-- **47 Built-in Effects:** Includes 28 AuroraDemo patterns, generative effects (`Plasma`, `Wave`, `Fire`, `Meta Balls`, `Random Pixel`, etc.), `Scrolling Text` (with cross-platform font lookup and palette/solid colors), and `Screen Capture`.
+- **39 Built-in Effects:** Includes generative patterns (`Plasma`, `Wave`, `Fire`, `Falling Snow`, `Starfield`, `3D Maze`, `Meta Balls`, `Random Pixel`, etc.), Aurora patterns, `Scrolling Text` (with cross-platform font lookup and palette/solid colors), and `Screen Capture`.
 - **Image / GIF (`Image / GIF`):** Plays static images and animated GIFs with `Stretch`, `Fit`, `Fill`, and `Center` modes.
 - **Video Player (`Video Player`):** Decodes video files scaled to your matrix dimensions. Defaults to **Fill (Crop)** (aspect-preserving scale cropped on whichever axis overflows to completely fill the panel), with `Fit (Letterbox)` and `Stretch` options.
 - **User Effect Plugins:** Drop custom Python effects into `~/.glediator/effects/` (open quickly via **Help → Open Effects Folder**). See [docs/effects.md](https://github.com/mrcodetastic/Glediator/blob/master/docs/effects.md).
@@ -33,7 +33,7 @@ Glediator uses a dual-deck live mixer layout:
   - **Speed (`0–4×`):** Scales animation speed globally.
   - **Tap BPM (`T`):** Tap 2+ times to clock `lfo_sine` and `lfo_saw` parameter modulations in sync with music.
 - **Audio Reactivity & Modulation:**
-  - `VU Meter`, `Simple Spectrum`, and `Spectrum Analyser` capture **System Output** (loopback) or **Microphone** audio.
+  - `VU Meter` and `Spectrum Analyser` capture **System Output** (loopback) or **Microphone** audio.
   - Click **`~`** next to any numeric parameter in the **Layer Inspector** to modulate it with `bass`, `mid`, `treble`, `level`, `peak`, `beat`, `lfo_sine`, or `lfo_saw`.
   - *Linux:* ensure a PipeWire/PulseAudio monitor source is enabled for loopback. *macOS:* use a loopback device such as BlackHole.
 
