@@ -171,6 +171,13 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(undo_act)
         edit_menu.addAction(redo_act)
         edit_menu.addSeparator()
+        copy_ab_act = edit_menu.addAction("Copy A to B")
+        copy_ab_act.triggered.connect(lambda: self._copy_scene("left", "right"))
+        copy_ba_act = edit_menu.addAction("Copy B to A")
+        copy_ba_act.triggered.connect(lambda: self._copy_scene("right", "left"))
+        swap_ab_act = edit_menu.addAction("Swap A and B")
+        swap_ab_act.triggered.connect(self._swap_scenes)
+        edit_menu.addSeparator()
         pal_act = edit_menu.addAction("Custom Palettes…")
         pal_act.triggered.connect(self._open_palette_editor)
 
@@ -298,8 +305,6 @@ class MainWindow(QMainWindow):
             panel.scene_mutated.connect(self._on_scene_mutated)
 
         self.fader_panel = FaderPanel(self.engine)
-        self.fader_panel.copy_scene_requested.connect(self._copy_scene)
-        self.fader_panel.swap_scenes_requested.connect(self._swap_scenes)
 
         self.network_panel = NetworkPanel(self.engine, self.config)
         self.network_panel.status_message.connect(lambda msg: self.statusBar().showMessage(msg, 4000))

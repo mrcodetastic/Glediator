@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -18,9 +18,6 @@ from glediator.core.fader import TRANSITION_KINDS
 
 
 class FaderPanel(QGroupBox):
-    copy_scene_requested = Signal(str, str)
-    swap_scenes_requested = Signal()
-
     def __init__(self, engine: RenderEngine, parent: QWidget | None = None) -> None:
         super().__init__("FINAL OUTPUT · MASTER", parent)
         self.engine = engine
@@ -37,33 +34,42 @@ class FaderPanel(QGroupBox):
         fader_line.addWidget(QLabel("B"))
         layout.addLayout(fader_line)
 
-        scene_ops_row = QHBoxLayout()
-        a_to_b = QPushButton("A → B")
-        a_to_b.clicked.connect(lambda: self.copy_scene_requested.emit("left", "right"))
-        swap_btn = QPushButton("Swap A ↔ B")
-        swap_btn.clicked.connect(self.swap_scenes_requested.emit)
-        b_to_a = QPushButton("B → A")
-        b_to_a.clicked.connect(lambda: self.copy_scene_requested.emit("right", "left"))
-        scene_ops_row.addWidget(a_to_b)
-        scene_ops_row.addWidget(swap_btn)
-        scene_ops_row.addWidget(b_to_a)
-        layout.addLayout(scene_ops_row)
-
         trans_row = QHBoxLayout()
         self.transition_combo = QComboBox()
         self.transition_combo.addItems(list(TRANSITION_KINDS))
-        self.transition_combo.currentTextChanged.connect(self.engine.set_transition_kind)
+        self.transition_combo.currentTextChanged.connect(self._on_transition_config_changed)
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setRange(0.1, 30.0)
+        self.duration_spin.setDecimals(1)
         self.duration_spin.setSingleStep(0.5)
-        self.duration_spin.setValue(2.0)
+        self.duration_spin.setValue(float(getattr(self.engine, "loop_duration_s", 2.0)))
         self.duration_spin.setSuffix(" s")
+        self.duration_spin.valueChanged.connect(lambda _v: self._on_transition_config_changed())
         self.auto_btn = QPushButton("Auto A ↔ B")
         self.auto_btn.clicked.connect(self._start_auto_transition)
         trans_row.addWidget(self.transition_combo, 1)
         trans_row.addWidget(self.duration_spin)
         trans_row.addWidget(self.auto_btn)
         layout.addLayout(trans_row)
+
+        loop_row = QHBoxLayout()
+        self.loop_btn = QPushButton("Loop A ↔ B")
+        self.loop_btn.setCheckable(True)
+        self.loop_btn.setChecked(bool(getattr(self.engine, "loop_fader", False)))
+        self.loop_btn.setToolTip("Continuously alternate A ↔ B using the transition style and hold time")
+        self.loop_btn.toggled.connect(self._on_loop_toggled)
+        self.loop_hold_spin = QDoubleSpinBox()
+        self.loop_hold_spin.setRange(0.0, 300.0)
+        self.loop_hold_spin.setDecimals(1)
+        self.loop_hold_spin.setSingleStep(0.5)
+        self.loop_hold_spin.setValue(float(getattr(self.engine, "loop_hold_s", 5.0)))
+        self.loop_hold_spin.setSuffix(" s")
+        self.loop_hold_spin.setToolTip("Seconds to stay on A or B before automatically transitioning to the other")
+        self.loop_hold_spin.valueChanged.connect(lambda v: self.engine.set_loop_fader(hold_s=v))
+        loop_row.addWidget(self.loop_btn, 1)
+        loop_row.addWidget(QLabel("Hold"))
+        loop_row.addWidget(self.loop_hold_spin)
+        layout.addLayout(loop_row)
 
         master_row = QHBoxLayout()
         self.blackout_btn = QPushButton("Blackout")
@@ -96,6 +102,21 @@ class FaderPanel(QGroupBox):
 
         self._refresh_toggle_styles()
 
+    def _on_transition_config_changed(self, *_args) -> None:
+        self.engine.set_loop_fader(
+            duration_s=float(self.duration_spin.value()),
+            kind=self.transition_combo.currentText(),
+        )
+
+    def _on_loop_toggled(self, checked: bool) -> None:
+        self.engine.set_loop_fader(
+            enabled=checked,
+            hold_s=float(self.loop_hold_spin.value()),
+            duration_s=float(self.duration_spin.value()),
+            kind=self.transition_combo.currentText(),
+        )
+        self._refresh_toggle_styles()
+
     def _start_auto_transition(self) -> None:
         target = 1.0 if self.engine.fader < 0.5 else 0.0
         self.engine.start_transition(
@@ -123,6 +144,10 @@ class FaderPanel(QGroupBox):
             self.bpm_label.setText(f"{bpm:.0f} BPM")
 
     def _refresh_toggle_styles(self) -> None:
+        if self.loop_btn.isChecked():
+            self.loop_btn.setStyleSheet("background:#16a34a; color:white; font-weight:700;")
+        else:
+            self.loop_btn.setStyleSheet("")
         if self.blackout_btn.isChecked():
             self.blackout_btn.setStyleSheet("background:#dc2626; color:white; font-weight:700;")
         else:
@@ -136,6 +161,16 @@ class FaderPanel(QGroupBox):
         self.fader_slider.blockSignals(True)
         self.fader_slider.setValue(round(self.engine.fader * 100))
         self.fader_slider.blockSignals(False)
+        self.loop_btn.blockSignals(True)
+        self.loop_btn.setChecked(bool(self.engine.loop_fader))
+        self.loop_btn.blockSignals(False)
+        self.loop_hold_spin.blockSignals(True)
+        self.loop_hold_spin.setValue(float(self.engine.loop_hold_s))
+        self.loop_hold_spin.blockSignals(False)
+        self.duration_spin.blockSignals(True)
+        self.duration_spin.setValue(float(self.engine.loop_duration_s))
+        self.duration_spin.blockSignals(False)
+        self._refresh_toggle_styles()
 
     def sync_from_status(self, status: EngineStatus) -> None:
         if not self.fader_slider.isSliderDown():
@@ -144,6 +179,15 @@ class FaderPanel(QGroupBox):
                 self.fader_slider.blockSignals(True)
                 self.fader_slider.setValue(val)
                 self.fader_slider.blockSignals(False)
+        if self.loop_btn.isChecked() != status.loop_fader:
+            self.loop_btn.blockSignals(True)
+            self.loop_btn.setChecked(status.loop_fader)
+            self.loop_btn.blockSignals(False)
+            self._refresh_toggle_styles()
+        if not self.loop_hold_spin.hasFocus() and abs(self.loop_hold_spin.value() - status.loop_hold_s) > 1e-3:
+            self.loop_hold_spin.blockSignals(True)
+            self.loop_hold_spin.setValue(status.loop_hold_s)
+            self.loop_hold_spin.blockSignals(False)
         if self.blackout_btn.isChecked() != status.blackout:
             self.blackout_btn.blockSignals(True)
             self.blackout_btn.setChecked(status.blackout)

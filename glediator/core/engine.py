@@ -26,6 +26,8 @@ class EngineStatus:
     fader: float = 0.5
     transition_active: bool = False
     transition_kind: str = "crossfade"
+    loop_fader: bool = False
+    loop_hold_s: float = 5.0
     blackout: bool = False
     freeze: bool = False
     speed: float = 1.0
@@ -53,6 +55,10 @@ class RenderEngine:
         self.fader = 0.5
         self.transition_kind = "crossfade"
         self._transition: Transition | None = None
+        self.loop_fader = False
+        self.loop_hold_s = 5.0
+        self.loop_duration_s = 2.0
+        self._loop_next_at: float | None = None
         self.blackout = False
         self.freeze = False
         self.speed = 1.0
@@ -192,12 +198,50 @@ class RenderEngine:
         with self._lock:
             if cancel_transition:
                 self._transition = None
+                if self.loop_fader:
+                    self._loop_next_at = self._clock() + self.loop_hold_s
             self.fader = min(1.0, max(0.0, float(amount)))
 
     def set_transition_kind(self, kind: str) -> None:
         if kind in TRANSITION_KINDS:
             with self._lock:
                 self.transition_kind = kind
+
+    def set_loop_fader(
+        self,
+        enabled: bool | None = None,
+        hold_s: float | None = None,
+        duration_s: float | None = None,
+        kind: str | None = None,
+    ) -> None:
+        with self._lock:
+            if hold_s is not None:
+                old_hold = self.loop_hold_s
+                self.loop_hold_s = max(0.0, min(300.0, float(hold_s)))
+                if self.loop_fader and self._loop_next_at is not None:
+                    self._loop_next_at += self.loop_hold_s - old_hold
+            if duration_s is not None:
+                self.loop_duration_s = max(0.1, min(30.0, float(duration_s)))
+            if kind in TRANSITION_KINDS:
+                self.transition_kind = kind
+            if enabled is not None:
+                want = bool(enabled)
+                if want and not self.loop_fader:
+                    self.loop_fader = True
+                    now = self._clock()
+                    if self._transition is None:
+                        target = 1.0 if self.fader < 0.5 else 0.0
+                        self._transition = Transition(
+                            kind=self.transition_kind,
+                            start_value=self.fader,
+                            target=target,
+                            duration=self.loop_duration_s,
+                            started_at=now,
+                        )
+                    self._loop_next_at = None
+                elif not want:
+                    self.loop_fader = False
+                    self._loop_next_at = None
 
     def start_transition(
         self,
@@ -209,6 +253,7 @@ class RenderEngine:
         with self._lock:
             chosen_kind = kind if kind in TRANSITION_KINDS else self.transition_kind
             self.transition_kind = chosen_kind
+            self._loop_next_at = None
             self._transition = Transition(
                 kind=chosen_kind,
                 start_value=self.fader,
@@ -221,6 +266,8 @@ class RenderEngine:
     def cancel_transition(self) -> None:
         with self._lock:
             self._transition = None
+            self.loop_fader = False
+            self._loop_next_at = None
 
     def set_matrix_size(self, width: int, height: int) -> None:
         width, height = max(8, min(512, int(width))), max(8, min(512, int(height)))
@@ -340,6 +387,9 @@ class RenderEngine:
                 "right": self.right_scene.to_dict(),
                 "fader": self.fader,
                 "transition_kind": self.transition_kind,
+                "loop_fader": self.loop_fader,
+                "loop_hold_s": self.loop_hold_s,
+                "loop_duration_s": self.loop_duration_s,
                 "width": self.config.width,
                 "height": self.config.height,
             }
@@ -360,6 +410,10 @@ class RenderEngine:
             self.fader = min(1.0, max(0.0, float(state.get("fader", 0.5))))
             if state.get("transition_kind") in TRANSITION_KINDS:
                 self.transition_kind = state["transition_kind"]
+            self.loop_fader = bool(state.get("loop_fader", False))
+            self.loop_hold_s = max(0.0, min(300.0, float(state.get("loop_hold_s", 5.0))))
+            self.loop_duration_s = max(0.1, min(30.0, float(state.get("loop_duration_s", 2.0))))
+            self._loop_next_at = (self._clock() + self.loop_hold_s) if self.loop_fader else None
             self._transition = None
 
     def scene_snapshot(self, side: str) -> dict:
@@ -388,6 +442,8 @@ class RenderEngine:
                 fader=self.fader,
                 transition_active=self._transition is not None,
                 transition_kind=self.transition_kind,
+                loop_fader=self.loop_fader,
+                loop_hold_s=self.loop_hold_s,
                 blackout=self.blackout,
                 freeze=self.freeze,
                 speed=self.speed,
@@ -453,6 +509,21 @@ class RenderEngine:
                 self.fader = val
                 if done:
                     self._transition = None
+                    if self.loop_fader:
+                        self._loop_next_at = started + self.loop_hold_s
+            elif self.loop_fader:
+                if self._loop_next_at is None:
+                    self._loop_next_at = started + self.loop_hold_s
+                if started >= self._loop_next_at:
+                    target = 1.0 if self.fader < 0.5 else 0.0
+                    self._transition = Transition(
+                        kind=self.transition_kind,
+                        start_value=self.fader,
+                        target=target,
+                        duration=self.loop_duration_s,
+                        started_at=started,
+                    )
+                    self._loop_next_at = None
 
             if audio_state:
                 det = float(audio_state.get("audio_bpm", 0.0))

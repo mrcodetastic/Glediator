@@ -68,5 +68,16 @@ def test_inspector_undo_preview_and_docks(qtbot, monkeypatch):
     window.playlist_panel._add_entry()
     assert window.playlist_panel.entry_list.count() == 1
 
+    # Edit menu exposes Copy A to B, Copy B to A, Swap A and B instead of FaderPanel buttons
+    edit_menu = next(a.menu() for a in window.menuBar().actions() if "Edit" in a.text())
+    edit_labels = {act.text() for act in edit_menu.actions()}
+    assert {"Copy A to B", "Copy B to A", "Swap A and B"}.issubset(edit_labels)
+    window.fader_panel.loop_hold_spin.setValue(1.5)
+    window.fader_panel.loop_btn.setChecked(True)
+    assert engine.loop_fader is True
+    assert engine.loop_hold_s == 1.5
+    window.fader_panel.loop_btn.setChecked(False)
+    assert engine.loop_fader is False
+
     window.close()
     engine.stop()

@@ -40,6 +40,22 @@ def test_transition_modes_and_auto_crossfade():
     engine.step()
     assert engine.fader == 1.0
 
+    # Continuous Loop A <-> B cycles after hold period
+    engine.set_fader(0.0)
+    engine.set_loop_fader(enabled=True, hold_s=3.0, duration_s=1.0, kind="crossfade")
+    now[0] = 3.0  # started at 2.0 + 1.0 duration = 3.0
+    engine.step()
+    assert engine.fader == 1.0
+    now[0] = 5.5  # still holding on B before 3.0 + 3.0 = 6.0
+    engine.step()
+    assert engine.fader == 1.0
+    now[0] = 6.0  # starts transitioning back toward A
+    engine.step()
+    now[0] = 7.0
+    engine.step()
+    assert engine.fader == 0.0
+    engine.set_loop_fader(enabled=False)
+
 
 def test_master_blackout_freeze_and_speed():
     now = [0.0]

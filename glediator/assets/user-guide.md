@@ -9,7 +9,7 @@ Repository & latest documentation: [github.com/mrcodetastic/Glediator](https://g
 Glediator uses a dual-deck live mixer layout:
 
 - **Source A & Source B:** Each source hosts up to **5 layers**. Layers render top-to-bottom and combine using per-layer blend modes (`Add`, `Subtract`, `Multiply`, `Difference`, `Screen`, `Maximum`, `Normal`, `Lighten`, `Darken`, `Overlay`, `Average`), **Opacity** (`0–100%`), **Brightness** (`0–100%`), and up to **3 chained filters**.
-- **Layer Operations:** Drag and drop layers to reorder them, right-click for **Duplicate / Move / Remove / Rename source**, or use **A → B**, **Swap A ↔ B**, and **B → A** in the center output panel.
+- **Layer Operations:** Drag and drop layers to reorder them, right-click for **Duplicate / Move / Remove / Rename source**, or use **Edit → Copy A to B**, **Copy B to A**, and **Swap A and B**.
 - **Layer Inspector (right dock):** Click any layer to edit its parameters live (changes apply immediately), reset defaults, manage its filter chain, or attach audio/LFO modulation (`~` button on any numeric parameter).
 - **Preview Modes:** Right-click any preview card to toggle between crisp **Pixels** and **LED dots**, or **Copy frame as PNG** to the clipboard.
 
@@ -26,7 +26,7 @@ Glediator uses a dual-deck live mixer layout:
 
 ## 3. Live Show Control
 
-- **Transitions:** Use the crossfader manually or click **Auto A ↔ B** with `crossfade`, `cut`, `wipe_left`, `wipe_right`, `wipe_up`, `wipe_down`, `dissolve`, or `luma` over `0.1–30 s`.
+- **Transitions & Looping:** Use the crossfader manually, click **Auto A ↔ B** with `crossfade`, `cut`, `wipe_left`, `wipe_right`, `wipe_up`, `wipe_down`, `dissolve`, or `luma` over `0.1–30 s`, or enable **Loop A ↔ B** with a configurable **Hold** time (`0–300 s`) to alternate continuously between A and B.
 - **Master Controls:**
   - **Blackout:** Sends all-black frames to connected LED panels while keeping previews visible with a `BLACKOUT` badge.
   - **Freeze:** Pauses scene rendering and holds the current output frame.
