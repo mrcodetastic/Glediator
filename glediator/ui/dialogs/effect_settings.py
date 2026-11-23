@@ -90,9 +90,9 @@ def create_param_editor(kind: str, default, minimum, maximum, step, value, *, ke
         editor.setValue(int(value if value is not None else default))
         return editor
     editor = QDoubleSpinBox()
+    editor.setDecimals(1)
     editor.setRange(float(minimum), float(maximum))
-    editor.setSingleStep(float(step))
-    editor.setDecimals(3)
+    editor.setSingleStep(max(0.1, float(step)))
     editor.setValue(float(value if value is not None else default))
     return editor
 

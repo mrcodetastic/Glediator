@@ -61,13 +61,13 @@ class ModulationDialog(QDialog):
 
         self.min_spin = QDoubleSpinBox()
         self.min_spin.setRange(float(low), float(high))
-        self.min_spin.setDecimals(3)
+        self.min_spin.setDecimals(1)
         self.min_spin.setValue(float(existing.get("min", low)) if existing else float(low))
         form.addRow("Min", self.min_spin)
 
         self.max_spin = QDoubleSpinBox()
         self.max_spin.setRange(float(low), float(high))
-        self.max_spin.setDecimals(3)
+        self.max_spin.setDecimals(1)
         self.max_spin.setValue(float(existing.get("max", high)) if existing else float(high))
         form.addRow("Max", self.max_spin)
 
@@ -313,7 +313,7 @@ class LayerInspector(QWidget):
                 slider = QSlider(Qt.Orientation.Horizontal)
                 slider.setMinimumWidth(36)
                 editor.setFixedWidth(96)
-                scale = 1 if kind == "int" else 1000
+                scale = 1 if kind == "int" else 10
                 slider.setRange(round(float(low) * scale), round(float(high) * scale))
                 slider.setValue(round(float(val) * scale))
                 slider.valueChanged.connect(
