@@ -12,7 +12,11 @@ This standalone Arduino sketch receives Glediator frames, advertises itself on t
 
 Copy `config.example.h` to `config.h` (`config.h` is gitignored) and edit your Wi-Fi credentials and panel layout (`PANEL_WIDTH`, `PANEL_HEIGHT`, `PANEL_CHAIN`). If `config.h` does not exist, the sketch falls back to `config.example.h`.
 
-The Python app always sends pixels in row-major order from `(0, 0)` to `(W - 1, H - 1)` where `W = PANEL_WIDTH * PANEL_CHAIN` and `H = PANEL_HEIGHT`. Any physical panel chaining or wiring transform is handled in the receiver.
+### Virtual Frame vs. Physical Panel Chaining
+
+- Glediator has no knowledge of physical LED wiring, serpentine routing, or chained panel geometry—it only renders and streams the logical **virtual display output** in plain row-major order from `(0, 0)` to `(W - 1, H - 1)`.
+- Any physical panel chaining, 2D multi-panel layouts (such as `VirtualMatrixPanel`), scan-rate selection, or wiring transformations must be configured on the ESP32 side via the **ESP32-HUB75-MatrixPanel-I2S-DMA** configuration (`HUB75_I2S_CFG` / virtual mapping classes). Refer to the [ESP32-HUB75-MatrixPanel-DMA documentation](https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA) for instructions on chaining and mapping different panel types together.
+- **Multiple receivers:** If you connect multiple ESP32 receivers simultaneously, every receiver must use the **same configured virtual matrix dimensions (`W × H`)**, because Glediator produces and broadcasts one uniform output frame size to all connected clients.
 
 ## Discovery and WebSocket protocol
 
